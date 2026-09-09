@@ -484,8 +484,10 @@ to enable VoiceView, the third being:
 > Via shell: `vega device shell` then run
 > `vdcm set "com.amazon.devconf/system/accessibility/VoiceViewEnabled" "ENABLED"`
 
-Tried it both through `vega device run-cmd -c '...'` and through an interactive
-`vega device shell` session, on a freshly booted VVD (`vvrp-tv-arm64`, OS 1.2,
+Tried it through `vega device run-cmd -c '...'`, through an interactive
+`vega device shell` session, and through `vega exec vda shell` (the variant used
+in Amazon's own support replies) — all three land in the same
+"Developer mode Shell" as `uid=5000(app_user)` and all three are refused — on a freshly booted VVD (`vvrp-tv-arm64`, OS 1.2,
 SDK 0.24.9914, CLI 1.3.4, developer mode on).
 
 **Expected.** VoiceView enabled, per the documented procedure.
@@ -563,3 +565,114 @@ on|off`. Failing either, correct the FAQ to state that the shell method requires
 privileges the developer shell does not have, and that the UI methods are the
 only ones available on the VVD. Right now the documented path fails with an error
 that gives no hint the instruction itself is unusable.
+
+---
+
+## FL-012 — Media playback appears non-functional on the Vega Virtual Device; both official media samples fail
+
+**Severity:** Critical (blocks all media development on the simulator)
+
+**Task attempted.** Play a single audio file on the Vega Virtual Device.
+
+**Environment.** Vega CLI 1.3.4, SDK 0.24.9914, VVD `vvrp-tv-arm64` OS 1.2, macOS
+26.6.2 arm64. Freshly booted device, both test apps uninstalled beforehand,
+`build/` deleted, clean installs throughout.
+
+**Three independent cases, all failing.**
+
+**1. `AmazonAppDev/vega-video-sample` — SIGSEGV.** Unmodified, current HEAD.
+Playback fails and the device produces crash tombstones. Stackwalk shows
+`libRCT-folly-0.83` and `libRCT-folly-0.72` both loaded in one process with the
+crashing chain crossing between them. Detailed separately in FL-008.
+
+**2. `AmazonAppDev/vega-audio-sample` — ANR on launch.** Unmodified, current HEAD,
+`npm install` + `npm run build:debug` clean. `vega run-app` reports "Successfully
+launched the app", but `vega device is-app-running` returns not running, the
+launcher stays on screen, and the device produces tombstones:
+
+```
+CrashLang: Native
+CrashReason: AppNotResponding
+Crash reason: SIGQUIT
+AppVersion: 3.24.0
+
+Thread 0 (crashed)
+ 0  libc.so.6 + 0xe7b84
+ 1  libasync.so.0 + 0x9bc2
+```
+
+The app hangs during startup and is killed. It never renders.
+
+**3. A minimal app from the SDK's own `helloWorld` template — media never
+loads.** This is the informative case, because the app itself runs perfectly
+stably; only media fails.
+
+Setup mirrors `vega-audio-sample`'s `AudioHandler.ts`: `new AudioPlayer()`,
+`setMediaControlFocus(componentInstance)` from
+`useKeplerAppStateManager().getComponentInstance()`, then `src`, `load()`,
+`play()`. Media and audio services declared in `manifest.toml` (`media.server`,
+`mediametrics`, `media.playersession`, `mediabuffer`, `mediatransform`,
+`gipc.uuid.*`, `audio.stream`, `audio.control`, `audio.system`, `network.service`,
+plus the accessibility privilege and `net-info`).
+
+Every source fails identically with **`MediaError.code === 4`
+(`MEDIA_ERR_SRC_NOT_SUPPORTED`)**, and — the key detail — **no HTTP request ever
+leaves the device**, verified against an access log on the host:
+
+| Source | Result |
+|---|---|
+| `http://10.0.2.2:8099/desc.mp3` (host-served, `audio/mpeg`) | code 4, no fetch |
+| `http://10.0.2.2:8099/desc.m4a` | code 4, no fetch |
+| `http://10.0.2.2:8099/desc.wav` | code 4, no fetch |
+| `https://d1v0fxmwkpxbrg.cloudfront.net/audio-assets/Downtown.mp3` — **`vega-audio-sample`'s own track URL** | code 4, no fetch |
+
+Meanwhile `canPlayType()` on the same player instance reports:
+
+```
+audio/mpeg=probably  audio/mp4=probably  audio/aac=probably
+audio/flac=probably  audio/ogg=probably
+audio/wav=no  audio/x-wav=no  application/x-mpegURL=no  application/dash+xml=no
+```
+
+**The player reports `"probably"` for `audio/mpeg` and then rejects an MP3 as
+`SRC_NOT_SUPPORTED` without attempting to fetch it.** Those two behaviours cannot
+both be right.
+
+**Systematically eliminated**, each by direct test rather than inference:
+
+- Device state — fresh boot, both apps uninstalled, clean install
+- Stale bundle — `build/` deleted; markers verified present in the aarch64 bundle
+- Constructor arguments — `new AudioPlayer()`, `(SPEECH, USAGE_ACCESSIBILITY)`,
+  `(SPEECH, USAGE_MEDIA)` and `(MUSIC, USAGE_MEDIA)` all identical
+- Source URL, scheme and host — the sample's own HTTPS CloudFront URL fails too
+- Container/codec — mp3, m4a and wav all fail
+- `setMediaControlFocus()` — added, reports success, changes nothing
+- Manifest declarations — diffed against `vega-audio-sample`; the probe declares
+  a superset of its media modules
+- Load/play sequencing — final attempt matched `AudioHandler.ts` exactly:
+  construct, `setMediaControlFocus`, `initialize()`, attach listeners, set `src`
+  with `autoplay = false`, no explicit `load()`, and `play()` only on `canplay`.
+  Identical failure.
+- Emulator audio configuration — the instance `config.ini` has no
+  `hw.audioOutput` line, but the resolved `hardware-qemu.ini` shows
+  `hw.audioOutput = true`, so emulator audio output is enabled
+- Privileged shell — `vega exec vda shell` (used in Amazon's own support replies)
+  is the same shell as `vega device shell`, same `app_user`
+
+**Device-side audio hardware is present and correctly provisioned.**
+`/proc/asound/cards` shows `virtio-snd - VirtIO SoundCard`, and
+`/proc/asound/pcm` reports `VirtIO PCM 0 : playback 4 : capture 2`. So the
+virtual sound device exists with four playback streams; the failure is above it.
+
+**Workaround.** None found. Media development on the VVD appears blocked.
+
+**Actionable suggestion.** Please verify whether media playback works at all on
+the current OS 1.2 `vvrp-tv-arm64` VVD image with SDK 0.24.9914 — the two
+official media samples are the obvious regression tests and both fail, in
+different ways. If media playback requires physical hardware and is known not to
+work on the virtual device, that needs to be stated prominently in the Vega
+Virtual Device documentation: it is the difference between a developer choosing
+the simulator or buying a device, and right now the docs present the VVD as a
+general-purpose development target. Separately, `canPlayType()` returning
+`"probably"` for a type the player will then refuse is a bug in its own right —
+it is the API developers use precisely to avoid this situation.
