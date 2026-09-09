@@ -11,9 +11,10 @@
 ### 1. Summary
 
 On the Vega Virtual Device (`vvrp-tv-arm64`, OS 1.2, SDK 0.24.9914), `AudioPlayer`
-URL Mode playback fails for every source I have tried. Setting `.src` produces
-`MediaError.code === 4` (`MEDIA_ERR_SRC_NOT_SUPPORTED`) and **no HTTP request is
-ever issued** — verified against an access log on the host machine.
+URL Mode playback fails for every source I have tried — **including when running
+the audio-only example from the Vega documentation verbatim**. Setting `.src`
+produces `MediaError.code === 4` (`MEDIA_ERR_SRC_NOT_SUPPORTED`) and **no HTTP
+request is ever issued**, verified against an access log on the host machine.
 
 Native logging shows the app connects to `com.amazon.mediametrics.service`,
 `com.amazon.media.playersession.service` and `com.amazon.audio.control`, but
@@ -36,18 +37,45 @@ generated from the SDK's own `helloWorld` template)
 
 ### 2. Steps to Reproduce
 
-1. Generate a clean project from the SDK template:
-   `vega project generate -t helloWorld -n sightlineprobe --packageId com.sightline.probe`
-2. Add the media library, SDK-tracked:
-   `vega project install @amazon-devices/react-native-w3cmedia`
-3. Declare media and audio services in `manifest.toml` (full list in §7).
-4. Replace `App.tsx` with the snippet in §7 — it constructs an `AudioPlayer`,
-   calls `setMediaControlFocus()`, `initialize()`, then sets `.src` and plays.
+**The shortest reproduction is your own documentation's example.** The
+"Audio-Only Playback Example" on
+[Selecting the Playback Mode](https://developer.amazon.com/docs/vega/0.24/media-player-select-playback)
+fails on a clean project:
+
+1. `vega project generate -t helloWorld -n sightlineprobe --packageId com.sightline.probe`
+2. `vega project install @amazon-devices/react-native-w3cmedia`
+3. Declare media and audio services in `manifest.toml` (full list in §7)
+4. Put the documented audio-only example in `src/App.tsx`, unchanged apart from
+   the source URL and a status readout:
+
+```tsx
+const audio = useRef<AudioPlayer | null>(new AudioPlayer());
+
+audio.current?.initialize().then(() => {
+  audio.current!.autoplay = true;
+  audio.current!.src = 'http://10.0.2.2:8099/desc.mp3';
+});
+```
+
 5. `npm install && npm run build:debug`
 6. `vega virtual-device start`
 7. `vega run-app build/aarch64-debug/sightlineprobe_aarch64.vpkg com.sightline.probe.main`
 
-The app launches and runs stably. Only media playback fails.
+**Result:**
+
+```
+initialize()...  ->  init ok  ->  autoplay=true  ->  src set
+   ->  loadstart  ->  error code=4
+```
+
+and **zero HTTP requests reach the server**.
+
+The app itself launches and runs stably throughout. Only media playback fails.
+
+*Minor, separate documentation issue in that same example:* the snippet imports
+`VideoPlayer` from `@amazon-devices/react-native-w3cmedia` and types the ref as
+`useRef<VideoPlayer | null>(...)`, but then constructs `new AudioPlayer()` —
+which is never imported. The example as printed will not compile.
 
 ---
 
