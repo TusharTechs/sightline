@@ -61,12 +61,30 @@ reaches the server**:
 | `http://10.0.2.2:8099/desc.mp3` (host-served) | `audio/mpeg` | code 4, **no fetch** |
 | `http://10.0.2.2:8099/desc.m4a` | `audio/mp4a-latm` | code 4, **no fetch** |
 | `http://10.0.2.2:8099/desc.wav` | `audio/x-wav` | code 4, **no fetch** |
-| `https://d1v0fxmwkpxbrg.cloudfront.net/audio-assets/Downtown.mp3` — **`vega-audio-sample`'s own track URL** | `audio/mpeg` | code 4, **no fetch** |
+| `https://d1v0fxmwkpxbrg.cloudfront.net/audio-assets/Downtown.mp3` — `vega-audio-sample`'s own track URL | `audio/mpeg` | code 4 — **but see the HTTPS caveat below; this test is confounded** |
 
 The "no fetch" column is measured, not inferred: a `python3 -m http.server` on the
 host logs every request, and the device demonstrably can reach it (a
 `gst-launch-1.0 souphttpsrc` fetch from the device shell to the same URL succeeds
 and reaches EOS).
+
+**Important caveat on the HTTPS row — please discount it.** This machine is behind
+corporate TLS inspection (Netskope), and the VVD guest does not trust the
+intercepting CA, so *all* HTTPS from inside the device fails independently of this
+bug:
+
+```
+device shell: gst-launch souphttpsrc https://d1v0fxmwkpxbrg.cloudfront.net/... -> error (-5)
+device shell: gst-launch souphttpsrc https://www.amazon.com/                   -> error (-5)
+device shell: gst-launch souphttpsrc http://10.0.2.2:8099/desc.mp3             -> OK, EOS
+```
+
+So the CloudFront result proves nothing, and I am not relying on it. **The load-bearing
+case is the plain-HTTP local one**: a URL the device provably can fetch from its own
+shell is rejected by `AudioPlayer` with code 4 and no request ever issued. The
+same TLS interception also explains why the device cannot generate an Amazon
+account activation code ("Failed to generate activation code"), which is expected
+on this network and not part of this report.
 
 **`canPlayType()` on the same player instance contradicts this:**
 
@@ -176,7 +194,7 @@ here the backend appears never to be reached at all.
 | Stale device state | Fresh VVD boot; both apps uninstalled; clean install |
 | Stale bundle | `build/` deleted; markers verified present in the aarch64 bundle |
 | `AudioPlayer` constructor args | `new AudioPlayer()`, `(SPEECH, USAGE_ACCESSIBILITY)`, `(SPEECH, USAGE_MEDIA)`, `(MUSIC, USAGE_MEDIA)` — all identical |
-| Source URL / scheme / host | `vega-audio-sample`'s own HTTPS CloudFront URL fails too |
+| Source URL / scheme / host | Local plain-HTTP URLs fail identically to remote ones; the device fetches the same local URL fine from its own shell |
 | Container / codec | MP3, M4A and WAV all fail |
 | `setMediaControlFocus()` | Added via `useKeplerAppStateManager().getComponentInstance()`; reports success; no change |
 | Load/play sequencing | Final attempt matched `AudioHandler.ts` exactly — no explicit `load()`, `play()` only on `canplay`. Identical failure |
