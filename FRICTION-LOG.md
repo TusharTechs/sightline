@@ -363,9 +363,9 @@ environment established by `~/vega/env`, so it cannot locate SDK tools.
 
 **2. The CLI tool bootstraps its dependencies from PyPI at runtime, and fails
 behind TLS inspection.** `vega exec acr-report` pip-installs into a venv at
-`~/.kepler/acr_pyvenv` on each invocation. On a machine running Netskope — whose
-root CA `eproxy.caadmin.netskope.com` is installed in the System keychain, as is
-standard for corporate SASE deployments — every fetch fails:
+`~/.kepler/acr_pyvenv` on each invocation. On a machine running the intercepting proxy — whose
+intercepting root CA is installed in the System keychain, as is
+standard for TLS-inspecting proxy deployments — every fetch fails:
 
 ```
 SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED]
@@ -375,7 +375,7 @@ certificate verify failed: self-signed certificate in certificate chain'))
 Three things make this worse than a normal proxy problem:
 
 - **The standard workaround does not work.** `PIP_CERT`, `REQUESTS_CA_BUNDLE` and
-  `SSL_CERT_FILE`, all pointing at a valid bundle containing the corporate CA,
+  `SSL_CERT_FILE`, all pointing at a valid bundle containing the local intercepting CA,
   are ignored. The same bundle works correctly with the system `python3 -m pip`.
 - **Dependencies are resolved one per invocation** — jinja2, then requests, then
   pyelftools, then urllib3, then boto3, then rich — so a developer patching this
