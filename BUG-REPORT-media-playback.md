@@ -97,7 +97,7 @@ host logs every request, and the device demonstrably can reach it (a
 and reaches EOS).
 
 **Important caveat on the HTTPS row — please discount it.** This machine is behind
-corporate TLS inspection (Netskope), and the VVD guest does not trust the
+TLS inspection on my network, and the VVD guest does not trust the
 intercepting CA, so *all* HTTPS from inside the device fails independently of this
 bug:
 
@@ -242,8 +242,8 @@ Available on request and can be attached — say which would be most useful:
 - Host-side HTTP access log showing zero requests during playback attempts
 
 **Note on symbolication:** I could not symbolicate the ACRs. `vega exec acr-report`
-bootstraps its Python dependencies from PyPI at runtime and fails behind corporate
-TLS inspection, ignoring `PIP_CERT` / `REQUESTS_CA_BUNDLE`; after populating its
+bootstraps its Python dependencies from PyPI at runtime and fails behind TLS
+inspection, ignoring `PIP_CERT` / `REQUESTS_CA_BUNDLE`; after populating its
 venv offline by hand it runs and then stops at
 `Midway cookie not found at ~/.midway/cookie, please authenticate using mwinit`,
 which is internal-only. The MCP `symbolicate_acr` tool separately fails with
