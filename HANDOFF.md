@@ -69,6 +69,41 @@ Three capabilities, in priority order:
    "what is she wearing?" — answered from the frames. Impossible with a
    pre-recorded track; this is the LLM-native capability.
 
+**Describe the change, not the frame.** The sharpest input received so far, from
+a blind accessibility professional on the ADP list, about software walkthroughs:
+*"A walkthrough needs you to describe what changed, not what's there. Describe the
+frame and you get 'a settings window with a list of options' over and over, while
+the thing that actually happened, the box that just got ticked, goes by
+unmentioned. The information lives in the difference between two moments, not in
+either one of them. Most tools describe the picture. That's the whole problem in
+one sentence."*
+
+This is an architectural requirement, not a refinement. The pipeline is
+**frame-pair diff -> change description**, not frame -> description. Build it
+that way from the start.
+
+**Timing is a product decision, and it forks by content type.** Same source:
+*"A film leaves you gaps. A training video talks from the first second to the
+last, so there's nowhere to put a description without stepping on the narrator or
+stopping the video. Stopping it is fine on training and awful on a film."*
+
+So the register control is really a **mode**, not a slider:
+
+| Mode | Content | Behaviour |
+|---|---|---|
+| Fit the gaps | Film, drama | Never pause. Description must fit detected dialogue gaps. Craft matters. |
+| Pause and explain | Training, walkthroughs | Pausing is acceptable and often better. Plain and complete beats beautiful. |
+
+Settle this early — it changes what the player has to do, not just what the
+generator writes.
+
+**Evaluate by task, not by taste.** Also from the same source, and it is the
+test protocol *and* the demo structure: *"Don't ask us whether the description is
+good. Ask us to do the task. Play the walkthrough and ask what we'd click next.
+Play the film clip and ask who is in the room. Judging prose is a matter of
+taste. Judging whether somebody can act on it is not, and that's the only score
+that matters."*
+
 **Register is a product feature, not a quality dial.** A blind professional on
 the ADP mailing list put it best: *"On a movie I want craft. On a training video
 I want to know what's on the screen, and I'll take plain over beautiful every
@@ -291,6 +326,11 @@ headphones so the rest of the room hears normal audio. Two replies so far:
   described) and noted his sighted wife enjoys description because it catches
   things she missed and relieves her of describing. Both quotes are strong
   submission material.
+
+**Wish-list titles requested by list members** (content people actively want
+described, useful for testing and for the submission): *Places In The Heart*
+(1984, Sally Field) and *The Legend of Ben Hall* (2016, Australian). Both
+copyrighted — for private testing only, not for the demo video.
 
 **Saksham Trust** (Delhi, assistive technology) — emailed asking for remote
 introductions to people who watch film/TV regularly. Paid, 30 minutes, remote.
