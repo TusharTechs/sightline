@@ -82,6 +82,35 @@ This is an architectural requirement, not a refinement. The pipeline is
 **frame-pair diff -> change description**, not frame -> description. Build it
 that way from the start.
 
+**The salience rule — what counts as a change worth describing.** Once you work
+on differences, everything is a difference: the pointer moves, a list scrolls, a
+tooltip flashes. Describe all of it and you have something that never shuts up,
+which is worse than the tool that repeats "a settings window with a list of
+options". The rule, from the same source and adopted verbatim:
+
+> **A change matters when it changes what you can do next.**
+
+- Counts: a box got ticked. A button went from greyed out to live. A dialog
+  opened and nothing else will respond until it's dealt with. These are *state
+  changes*.
+- Doesn't count: a highlight moving, a hover, a scroll, a transient tooltip.
+  Decoration.
+
+**The pause rule derives from it, at no extra cost.** Pause for the things that
+changed what's possible; let everything else ride. One criterion drives both
+salience filtering and the decision to stop playback.
+
+**Playback speed is a first-class test condition.** Many blind users listen at
+1.5x-2x. A description that fits a dialogue gap perfectly at 1x can land on top
+of the narrator once sped up. Consequences:
+
+- Gap detection must operate in **playback time, not media time** — a 3s gap is
+  1.5s of wall clock at 2x.
+- Description length must be **budgeted to the gap at the current rate**, which
+  means generating for the playback rate rather than time-stretching audio
+  rendered at 1x. Fewer words at speed beats faster speech.
+- **Test the whole set at 1x, 1.5x and 2x.** Do not discover this at demo time.
+
 **Timing is a product decision, and it forks by content type.** Same source:
 *"A film leaves you gaps. A training video talks from the first second to the
 last, so there's nowhere to put a description without stepping on the narrator or
