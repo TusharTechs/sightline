@@ -76,13 +76,12 @@ shape we could not read" can never be scored as a salience decision.
 tools/make-ca-bundle.sh                       # once
 export SIGHTLINE_CA_BUNDLE=~/.config/sightline-ca.pem
 export SIGHTLINE_AWS_PROFILE=sightline        # keep it off the default profile
-tools/preflight.sh                            # checks TLS, credentials, model access
+tools/preflight.sh                            # checks connectivity, credentials, model access
 ```
 
-`tools/make-ca-bundle.sh` exists because this machine's network terminates TLS
-with its own chain, which otherwise breaks both the AWS API
-(`CERTIFICATE_VERIFY_FAILED`) and `pip`. Building a bundle from the machine's own
-trust store fixes both. Harmless on a normal network.
+`tools/make-ca-bundle.sh` builds a certificate bundle from the machine's own
+trust store. Some networks require this for HTTPS clients to validate; run it if
+you see certificate errors, and skip it otherwise.
 
 Backends: `bedrock` (default), `bedrock-legacy` (bedrock-runtime InvokeModel —
 try this if the Mantle endpoint rejects the request signature), `claude` (local

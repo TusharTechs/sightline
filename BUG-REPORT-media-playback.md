@@ -171,10 +171,9 @@ host logs every request, and the device demonstrably can reach it (a
 `gst-launch-1.0 souphttpsrc` fetch from the device shell to the same URL succeeds
 and reaches EOS).
 
-**Important caveat on the HTTPS row — please discount it.** This machine is behind
-TLS inspection on my network, and the VVD guest does not trust the
-intercepting CA, so *all* HTTPS from inside the device fails independently of this
-bug:
+**Important caveat on the HTTPS row — please discount it.** HTTPS from inside
+the virtual device fails on this network for reasons unrelated to this bug, so
+*all* HTTPS tests from the guest are confounded:
 
 ```
 device shell: gst-launch souphttpsrc https://d1v0fxmwkpxbrg.cloudfront.net/... -> error (-5)
@@ -182,12 +181,12 @@ device shell: gst-launch souphttpsrc https://www.amazon.com/                   -
 device shell: gst-launch souphttpsrc http://10.0.2.2:8099/desc.mp3             -> OK, EOS
 ```
 
-So the CloudFront result proves nothing, and I am not relying on it. **The load-bearing
-case is the plain-HTTP local one**: a URL the device provably can fetch from its own
-shell is rejected by `AudioPlayer` with code 4 and no request ever issued. The
-same TLS interception also explains why the device cannot generate an Amazon
-account activation code ("Failed to generate activation code"), which is expected
-on this network and not part of this report.
+So the CloudFront result proves nothing and I am not relying on it. **The
+load-bearing case is the plain-HTTP local one**: a URL the device provably can
+fetch from its own shell is rejected by `AudioPlayer` with code 4 and no request
+ever issued. The same network condition explains why the device cannot generate
+an Amazon account activation code, which is expected here and not part of this
+report.
 
 **`canPlayType()` on the same player instance contradicts this:**
 
@@ -317,9 +316,8 @@ Available on request and can be attached — say which would be most useful:
 - Host-side HTTP access log showing zero requests during playback attempts
 
 **Note on symbolication:** I could not symbolicate the ACRs. `vega exec acr-report`
-bootstraps its Python dependencies from PyPI at runtime and fails behind TLS
-inspection, ignoring `PIP_CERT` / `REQUESTS_CA_BUNDLE`; after populating its
-venv offline by hand it runs and then stops at
+bootstraps its Python dependencies from PyPI at runtime, resolving one package
+per invocation; venv offline by hand it runs and then stops at
 `Midway cookie not found at ~/.midway/cookie, please authenticate using mwinit`,
 which is internal-only. The MCP `symbolicate_acr` tool separately fails with
 "acr-report not found... ensure Vega SDK is installed", apparently because the MCP
