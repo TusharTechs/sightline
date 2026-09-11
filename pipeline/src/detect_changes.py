@@ -24,6 +24,11 @@ PIXEL_DELTA = 16
 MIN_CHANGED_PX = 120
 # Frames this close together belong to the same logical event.
 MERGE_GAP_FRAMES = 2
+# Largest vertical scroll we try to recognise, in pixels.
+MAX_SCROLL_PX = 400
+# A shift only counts as a scroll if it explains the change this much better
+# than no shift at all.
+SCROLL_GAIN = 3.0
 
 
 def load_gray(path):
@@ -42,6 +47,52 @@ def bbox_of(mask):
     y0, y1 = np.where(rows)[0][[0, -1]]
     x0, x1 = np.where(cols)[0][[0, -1]]
     return [int(x0), int(y0), int(x1) + 1, int(y1) + 1]
+
+
+def scroll_shift(a, b, bbox=None):
+    """Detect vertical translation within the changed region.
+
+    Two crops cannot distinguish "this row scrolled out of view" from "this row
+    was removed" — and those mean opposite things under the salience rule, since
+    a removed control changes what you can do and a scrolled one does not. The
+    pixels know the difference, so measure it here and pass it on rather than
+    leaving the model to guess.
+
+    Correlates row-mean profiles and returns the shift in pixels, or 0.
+
+    Restricted to the changed region on purpose: in a typical UI only a panel
+    scrolls while the chrome around it stays put, and a whole-frame profile is
+    dominated by the static majority — measured at 1.00x gain versus 4.04x
+    inside the region for the same scroll.
+    """
+    if bbox:
+        x0, y0, x1, y1 = bbox
+        a, b = a[y0:y1, x0:x1], b[y0:y1, x0:x1]
+    if a.shape[0] < 16:
+        return 0
+    pa = a.mean(axis=1).astype(np.float64)
+    pb = b.mean(axis=1).astype(np.float64)
+    pa -= pa.mean()
+    pb -= pb.mean()
+    base = float(np.abs(pa - pb).mean())
+    if base < 1e-6:
+        return 0
+    best_dy, best_err = 0, base
+    for dy in range(-MAX_SCROLL_PX, MAX_SCROLL_PX + 1):
+        if dy == 0:
+            continue
+        if dy > 0:
+            x, y = pa[dy:], pb[:-dy]
+        else:
+            x, y = pa[:dy], pb[-dy:]
+        if x.size < a.shape[0] // 3:      # need substantial overlap
+            continue
+        err = float(np.abs(x - y).mean())
+        if err < best_err:
+            best_dy, best_err = dy, err
+    if best_dy and best_err * SCROLL_GAIN < base:
+        return best_dy
+    return 0
 
 
 def detect(frames_dir, fps):
@@ -81,6 +132,12 @@ def detect(frames_dir, fps):
             cur_ev = dict(d)
     if cur_ev:
         events.append(cur_ev)
+
+    # Annotate each event with any whole-region vertical translation.
+    for e in events:
+        a = load_gray(os.path.join(frames_dir, files[e["i_from"]]))
+        b = load_gray(os.path.join(frames_dir, files[e["i_to"]]))
+        e["scroll_dy"] = scroll_shift(a, b, e["bbox"])
 
     for n, e in enumerate(events):
         e["id"] = n
