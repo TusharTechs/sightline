@@ -145,6 +145,44 @@ plus `duckVolumeAsync()`.
 
 ---
 
+## 5a. If URL mode fails, try MSE before assuming the device is broken
+
+On our virtual device `player.src = "<url>"` fails for **every** media type —
+audio, video-only, video with audio — with `MEDIA_ERR_SRC_NOT_SUPPORTED` and
+**no HTTP request issued at all**. The same player instance, in the same app and
+session, plays the same footage when the bytes are fed in through MSE.
+
+You do not need Shaka or hls.js to test this. Raw `MediaSource` is about fifteen
+lines and keeps the test about the platform rather than a player library:
+
+```ts
+const player = new VideoPlayer();
+await player.initialize();
+player.setSurfaceHandle(surfaceHandle);      // after initialize() resolves
+
+const ms = new MediaSource();
+ms.addEventListener('sourceopen', async () => {
+  const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.64001F,mp4a.40.2"');
+  const buf = await (await fetch(url)).arrayBuffer();
+  sb.addEventListener('updateend', () => { ms.endOfStream(); player.play(); });
+  sb.appendBuffer(new Uint8Array(buf));
+});
+(player as any).srcObject = ms;              // srcObject, not src
+```
+
+Two things that will waste your time otherwise:
+
+- **The content must be fragmented.** A normal MP4 will not append. Produce one
+  with
+  `ffmpeg -i in.mp4 -c copy -movflags +frag_keyframe+empty_moov+default_base_moof out.mp4`
+- **Get the codec string right.** `avc1.<profile><constraints><level>` in hex —
+  H.264 High profile at level 3.1 is `avc1.64001F`. Add `,mp4a.40.2` for AAC-LC.
+  `MediaSource.isTypeSupported()` will tell you before you append.
+
+Working probes for both paths are in this repository's `probes/` directory.
+
+---
+
 ## 6. Screenshots and input on the virtual device
 
 Keyboard mapping, straight from the launch arguments:
