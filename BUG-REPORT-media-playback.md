@@ -6,7 +6,11 @@
 
 ---
 
-## UPDATE — 11 September 2026: no audio sink can be created on this device
+> **STATUS: DO NOT POST YET.** The shell-level evidence below is confounded —
+> see "Caveat that undercuts this" at the end of this section. Needs the
+> listening test first.
+
+## UPDATE — 11 September 2026: audio sink cannot be created from a device shell
 
 **Correction to my own report first.** In the eliminated-hypotheses table in §3 I
 listed *"Missing audio hardware"* as ruled out, on the grounds that
@@ -104,6 +108,39 @@ I have not yet tried a host reboot; I'll report back after testing that.
 seconds, needs no app, and distinguishes "audio subsystem is wedged" from
 "application or media problem" immediately. It may be worth asking anyone
 reporting a code 4 on VVD to run it first.
+
+
+### Caveat that undercuts this — read before acting on it
+
+`vega device run-cmd` executes as `uid=5000(app_user)` inside a sandbox, with no
+Vega component instance, no audio focus session and no manifest-granted service
+access. So `AudioServer is unavailable` may mean *unavailable to this
+unprivileged process*, not *not running*. The same caveat applies to `/dev/snd`
+being absent and to no audio daemons appearing in `ps` — both are equally
+consistent with namespacing.
+
+**Evidence that the device's audio actually works:** on the 12:08 UTC boot, the
+boot animation played audio normally —
+
+```
+12:08:29 animationservice: ** [waitForFirstAudioFrame]: waiting for first audio frame
+12:08:29 animationservice: Audio Focus 1 is granted
+12:08:29 animationservice: initial audio frame client written at 6564803585,
+                           initial audio frame presented to hardware at 6613063543
+12:08:33 animationservice: [stop:4019] $$ stopping audio
+```
+
+— sixty seconds before the `novaaudiosink` test below failed on that same boot.
+
+So the honest reading is: **the device can play audio; something denies it to
+this app and to the two official samples.** Whether the shell test reflects the
+same denial or merely sandbox restrictions is unresolved. `keplervideosink`
+succeeding where audio sinks fail is suggestive but not conclusive, since video
+playback may not require an audio focus session.
+
+Open question to settle first: is any sound audible from the virtual device at
+all — boot chime, launcher navigation clicks? That distinguishes "audio works for
+system components, our app is denied" from "no audio reaches the host".
 
 ### The two questions that would unblock me
 
