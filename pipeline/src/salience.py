@@ -27,8 +27,10 @@ from PIL import Image
 CA_BUNDLE = os.environ.get(
     "SIGHTLINE_CA_BUNDLE", os.path.expanduser("~/.config/sightline-ca.pem"))
 if os.path.exists(CA_BUNDLE):
+    # Set, not setdefault: a narrower bundle already in the environment is the
+    # usual cause of "Connection error" here, and ours is a superset.
     for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"):
-        os.environ.setdefault(var, CA_BUNDLE)
+        os.environ[var] = CA_BUNDLE
 
 # Read the API key from a file if one is configured, so it never has to be
 # pasted into a terminal that is being shared or logged. chmod 600 it.
@@ -318,3 +320,67 @@ def describe_at_budget(changed, max_words, backend="anthropic"):
         client = _clients["anthropic"]
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     return client.messages.parse(**kwargs).parsed_output.description
+
+
+# ---------------------------------------------------------------------------
+# Ranking.
+#
+# "Rank the changes first, then let the gaps decide how far down the list you
+#  get. Same order every time. More of it at 1x, less of it at 2x. I can live
+#  with less. What I can't live with is a different story at a different speed."
+#
+# The tie-break is his too: a change the viewer CAUSED outranks one that merely
+# happened — "I clicked something and I'm waiting to hear it took. That's the
+# one I need."
+# ---------------------------------------------------------------------------
+
+RANK_PROMPT = """These changes all happened during a video, in this order. A blind
+viewer cannot see any of them, and there will not be time to describe them all.
+
+Rank them by how much each one changes what the viewer can do next. Rank 1 is
+the one they most need to hear.
+
+Tie-break, and it matters: a change the viewer CAUSED outranks a change that
+merely happened. Someone who has just acted is waiting to hear that it took
+effect.
+
+Be honest about the list. If something does not really change what they can do
+next, rank it last — do not pad the order to be polite.
+
+Changes:
+{items}"""
+
+
+def rank_changes(changes, backend="anthropic"):
+    """Return [{index, rank, caused_by_viewer, why}] covering every input."""
+    from pydantic import BaseModel, Field
+
+    class Ranked(BaseModel):
+        index: int = Field(description="0-based index of the change in the input list")
+        rank: int = Field(description="1 is most important")
+        caused_by_viewer: bool = Field(
+            description="did the viewer's own action cause this")
+        why: str = Field(description="one short clause")
+
+    class Ranking(BaseModel):
+        ranked: list[Ranked]
+
+    items = "\n".join(f"[{i}] at {c['t']}s — {c['changed']}"
+                       for i, c in enumerate(changes))
+    kwargs = dict(
+        max_tokens=8000,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": RANK_PROMPT.format(items=items)}],
+        output_format=Ranking,
+    )
+    if backend.startswith("bedrock"):
+        kwargs["model"] = BEDROCK_MODEL
+        client = _client("legacy" if backend.endswith("legacy") else "mantle")
+    else:
+        import anthropic
+        if "anthropic" not in _clients:
+            _clients["anthropic"] = anthropic.Anthropic()
+        client = _clients["anthropic"]
+        kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+    return [r.model_dump()
+            for r in client.messages.parse(**kwargs).parsed_output.ranked]

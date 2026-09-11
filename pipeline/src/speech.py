@@ -17,8 +17,10 @@ import argparse, json, os, re, subprocess, sys, tempfile
 # machine's own chain; see tools/make-ca-bundle.sh. Harmless when absent.
 _CA = os.environ.get("SIGHTLINE_CA_BUNDLE", os.path.expanduser("~/.config/sightline-ca.pem"))
 if os.path.exists(_CA):
+    # Set, not setdefault: a narrower bundle already in the environment is the
+    # usual cause of connection failures here, and ours is a superset.
     for _v in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"):
-        os.environ.setdefault(_v, _CA)
+        os.environ[_v] = _CA
 if os.environ.get("SIGHTLINE_AWS_PROFILE"):
     os.environ["AWS_PROFILE"] = os.environ["SIGHTLINE_AWS_PROFILE"]
 
