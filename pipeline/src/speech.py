@@ -28,19 +28,25 @@ BYTES_PER_FRAME = CHANNELS * 2   # s16
 
 # Comfortable description rate. Deliberately NOT raised to fit more in — the
 # whole point is that speeding up speech over sped-up content is unintelligible.
-DEFAULT_WPM = 170
+#
+# MEASURED, not assumed. `python3 src/speech.py calibrate` re-derives it; the
+# first value here was a guess of 170 that made every description overflow its
+# gap, because the generative voice actually delivers far fewer words a second.
+DEFAULT_WPM = 170          # the rate we ASK for (prosody is relative to this)
+MEASURED_WPM = float(os.environ.get("SIGHTLINE_MEASURED_WPM", "203"))  # calibrated, Polly generative Joanna
 DEFAULT_VOICE = "Samantha"        # macOS `say`
 POLLY_VOICE = "Joanna"            # supports the generative engine
 POLLY_REGION = os.environ.get("AWS_REGION", "us-east-1")
 POLLY_PCM_HZ = 16000              # Polly's pcm output is 16-bit mono, <=16kHz
 
 
-def budget_words(gap_seconds: float, playback_rate: float, wpm: int = DEFAULT_WPM) -> int:
+def budget_words(gap_seconds: float, playback_rate: float, wpm: float = None) -> int:
     """How many words fit in a gap, measured in playback time.
 
     A 3s gap at 2x is 1.5s of wall clock. We say fewer words at a normal rate,
     we do not say the same words twice as fast.
     """
+    wpm = MEASURED_WPM if wpm is None else wpm
     wall_clock = gap_seconds / max(playback_rate, 0.01)
     return max(0, int(wall_clock * (wpm / 60.0)))
 
@@ -83,10 +89,16 @@ def synthesize_polly(text: str, out_pcm: str, wpm: int = DEFAULT_WPM,
     with tempfile.TemporaryDirectory() as td:
         raw = os.path.join(td, "p.pcm")
         open(raw, "wb").write(audio)
+        # Polly pads both ends with silence. In fit-the-gaps mode that padding
+        # is charged against the gap budget, so trim it.
+        trim = ("silenceremove=start_periods=1:start_silence=0:"
+                "start_threshold=-50dB:detection=peak,areverse,"
+                "silenceremove=start_periods=1:start_silence=0:"
+                "start_threshold=-50dB:detection=peak,areverse")
         subprocess.run([
             "ffmpeg", "-y", "-loglevel", "error",
             "-f", "s16le", "-ar", str(POLLY_PCM_HZ), "-ac", "1", "-i", raw,
-            "-ar", str(RATE_HZ), "-ac", str(CHANNELS),
+            "-af", trim, "-ar", str(RATE_HZ), "-ac", str(CHANNELS),
             "-f", "s16le", "-acodec", "pcm_s16le", out_pcm,
         ], check=True)
     return _finish(out_pcm, text, wpm, voice, f"polly:{engine}")
@@ -124,12 +136,36 @@ def main():
     s.add_argument("--voice")
     s.add_argument("--engine", choices=["polly", "say"])
 
+    c = sub.add_parser("calibrate", help="measure the voice's real words per minute")
+    c.add_argument("--voice")
+    c.add_argument("--engine", choices=["polly", "say"])
+
     b = sub.add_parser("budget", help="words that fit a gap at a playback rate")
     b.add_argument("--gap", type=float, required=True)
     b.add_argument("--rate", type=float, default=1.0)
     b.add_argument("--wpm", type=int, default=DEFAULT_WPM)
 
     a = p.parse_args()
+    if a.cmd == "calibrate":
+        import tempfile as _tf
+        samples = [
+            "The checkbox is now ticked.",
+            "Save changes is now enabled and ready to click.",
+            "A confirmation dialog has opened asking you to apply the changes you made.",
+        ]
+        tot_w = tot_s = 0.0
+        with _tf.TemporaryDirectory() as td:
+            for i, t in enumerate(samples):
+                m = synthesize(t, os.path.join(td, f"c{i}.pcm"), voice=a.voice,
+                               engine=a.engine)
+                tot_w += m["words"]; tot_s += m["duration_s"]
+                print(f"  {m['words']:>2}w  {m['duration_s']:>6}s  "
+                      f"{m['words']/m['duration_s']*60:>6.1f} wpm   {t[:44]}")
+        print(json.dumps({"measured_wpm": round(tot_w / tot_s * 60, 1),
+                          "engine": m["engine"], "voice": m["voice"],
+                          "hint": "export SIGHTLINE_MEASURED_WPM=<value>"}, indent=2))
+        return
+
     if a.cmd == "say":
         print(json.dumps(synthesize(a.text, a.out, a.wpm, a.voice, a.engine), indent=2))
     else:
