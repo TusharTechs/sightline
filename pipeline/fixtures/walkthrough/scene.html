@@ -1,0 +1,105 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Notification settings — synthetic walkthrough</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; width:1280px; height:720px; background:#eef1f5;
+         font:16px/1.4 -apple-system, "Segoe UI", system-ui, sans-serif; color:#1b2430; }
+  .app { position:absolute; inset:40px; background:#fff; border-radius:10px;
+         box-shadow:0 8px 30px rgba(20,30,50,.13); overflow:hidden; }
+  header { padding:20px 28px; border-bottom:1px solid #e2e7ee; font-size:21px; font-weight:600; }
+  .body { padding:10px 0; height:470px; overflow:hidden; position:relative; }
+  .scroller { position:absolute; left:0; right:0; top:0; transition:none; }
+  .row { display:flex; align-items:center; gap:14px; padding:17px 28px; border-bottom:1px solid #f0f3f7; }
+  .row.focus { outline:3px solid #2f6fed; outline-offset:-3px; background:#f5f9ff; }
+  .box { width:22px; height:22px; border:2px solid #93a1b5; border-radius:5px; flex:none;
+         display:flex; align-items:center; justify-content:center; }
+  .box.on { background:#2f6fed; border-color:#2f6fed; }
+  .box.on::after { content:"✓"; color:#fff; font-size:15px; font-weight:700; }
+  .label { flex:1; }
+  .sub { color:#7b8798; font-size:14px; }
+  select { padding:8px 12px; border:1px solid #b9c3d1; border-radius:6px; background:#fff;
+           font-size:15px; min-width:170px; }
+  select:disabled { background:#f1f4f8; color:#a9b3c1; border-color:#dde3ea; }
+  .dim { color:#a9b3c1; }
+  footer { position:absolute; left:0; right:0; bottom:0; padding:18px 28px;
+           border-top:1px solid #e2e7ee; display:flex; justify-content:flex-end; gap:12px;
+           align-items:center; background:#fff; }
+  .status { margin-right:auto; color:#1f8a50; font-weight:600; }
+  button { padding:11px 22px; border-radius:7px; border:1px solid #2f6fed; background:#2f6fed;
+           color:#fff; font-size:15px; font-weight:600; }
+  button:disabled { background:#e8ecf2; border-color:#e8ecf2; color:#a9b3c1; }
+  button.ghost { background:#fff; color:#41506a; border-color:#c4cddb; }
+  .info { width:20px; height:20px; border-radius:50%; background:#c9d3e0; color:#fff;
+          font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .tip { position:absolute; background:#232c3a; color:#fff; padding:8px 12px; border-radius:6px;
+         font-size:13px; max-width:260px; }
+  .overlay { position:absolute; inset:0; background:rgba(18,25,38,.45); }
+  .modal { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:430px;
+           background:#fff; border-radius:10px; box-shadow:0 20px 60px rgba(10,16,28,.35); padding:26px; }
+  .modal h2 { margin:0 0 10px; font-size:19px; }
+  .modal p { margin:0 0 22px; color:#5c6879; }
+  .modal .btns { display:flex; justify-content:flex-end; gap:10px; }
+</style>
+<div id="root"></div>
+<script>
+// State is a PURE FUNCTION of t (seconds). Frame N is always identical for the
+// same t, so the ground truth below is exact and the render is reproducible.
+function state(t) {
+  return {
+    focus:      t >= 1 && t < 5 ? 'notify' : (t >= 5 && t < 8 ? 'sound' : null),
+    notifyOn:   t >= 2,
+    soundOn:    t >= 3,           // dropdown becomes enabled
+    tooltip:    t >= 4 && t < 5,  // transient
+    scrolled:   t >= 6,
+    saveOn:     t >= 7,
+    modal:      t >= 8 && t < 9.5,
+    saved:      t >= 9.5,
+  };
+}
+function render(t) {
+  const s = state(t);
+  const rows = [
+    ['notify', 'Enable notifications', 'Alerts for new activity', 'check', s.notifyOn],
+    ['sound',  'Notification sound',   'Played when an alert arrives', 'select', s.soundOn],
+    ['badge',  'Show unread badge',    'On the app icon', 'check', false],
+    ['digest', 'Daily digest email',   'Sent at 08:00', 'check', false],
+    ['quiet',  'Quiet hours',          '22:00 – 07:00', 'check', false],
+  ];
+  const rowHtml = rows.map(([id,label,sub,kind,on]) => `
+    <div class="row ${s.focus===id?'focus':''}">
+      ${kind==='check'
+        ? `<div class="box ${on?'on':''}"></div>`
+        : `<div class="box" style="border:none"></div>`}
+      <div class="label">
+        <div class="${kind==='select'&&!on?'dim':''}">${label}</div>
+        <div class="sub">${sub}</div>
+      </div>
+      ${kind==='select'
+        ? `<select ${on?'':'disabled'}><option>Chime</option></select>
+           <div class="info">i</div>`
+        : ''}
+    </div>`).join('');
+  document.getElementById('root').innerHTML = `
+    <div class="app">
+      <header>Notification settings</header>
+      <div class="body">
+        <div class="scroller" style="top:${s.scrolled?-96:0}px">${rowHtml}</div>
+        ${s.tooltip ? `<div class="tip" style="left:905px; top:150px">
+            Choose which sound plays for notifications.</div>` : ''}
+      </div>
+      <footer>
+        ${s.saved ? `<div class="status">Settings saved</div>` : ``}
+        <button class="ghost">Cancel</button>
+        <button ${s.saveOn?'':'disabled'}>Save changes</button>
+      </footer>
+      ${s.modal ? `<div class="overlay"></div>
+        <div class="modal">
+          <h2>Apply notification changes?</h2>
+          <p>Notifications will be enabled for this device.</p>
+          <div class="btns"><button class="ghost">Cancel</button><button>Apply</button></div>
+        </div>` : ``}
+    </div>`;
+}
+render(parseFloat(new URLSearchParams(location.search).get('t') || '0'));
+</script>

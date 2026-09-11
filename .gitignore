@@ -2,3 +2,7 @@ reference/
 node_modules/
 .DS_Store
 bug-artifacts/
+
+# pipeline working files
+pipeline/fixtures/**/frames/
+pipeline/out/*.pcm
