@@ -85,10 +85,14 @@ export const App = () => {
 
       setStatus('initialising player');
       await player.initialize();
-      // Driven by a poll rather than 'timeupdate'. The platform logs
-      // "No Time update event in Playing state" every 250ms, so that event is
-      // not dependable here — and a description that never fires is a silent
-      // failure, which is the worst kind in this app.
+      // Both a 'timeupdate' listener and a poll, for resolution rather than
+      // reliability. Measured: timeupdate fires about every 250ms, which is
+      // coarse when a description has to land inside a 1.7s gap — polling at
+      // 120ms roughly halves the worst-case latency into a gap.
+      //
+      // (The native layer logs "No Time update event in Playing state"
+      // continuously. That is end-of-stream noise, not a missing event —
+      // timeupdate delivery to JS was verified.)
       player.on('timeupdate', () => {
         scheduler.current?.tick(player.currentTime, player.rate);
       });
@@ -182,9 +186,18 @@ export const App = () => {
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#000'},
   surface: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
-  hud: {position: 'absolute', top: 28, left: 40, right: 40},
+  hud: {
+    position: 'absolute',
+    top: 28,
+    left: 40,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(8,12,18,0.72)',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
   badge: {color: '#fff', fontSize: 20, fontWeight: '600'},
-  status: {color: '#7a8899', fontSize: 15, marginTop: 2},
+  status: {color: '#b6c2d2', fontSize: 15, marginTop: 2},
   captionBar: {
     position: 'absolute',
     left: 60,
