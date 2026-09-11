@@ -25,7 +25,7 @@ Description Project list, and all architectural rather than cosmetic:
 |---|---|---|---|
 | 1. Change gate | `src/detect_changes.py` | no | **works — 9/9 on the fixture, 0 false positives** |
 | 2+3. Salience + description | `src/salience.py` | **yes** | scaffolded; blocked on a model backend |
-| 4. Speech + word budget | `src/speech.py` | no | works |
+| 4. Speech + word budget | `src/speech.py` | no | works — Amazon Polly (generative), `say` fallback |
 | 5. Evaluation | `src/evaluate.py` | no | works |
 | 6. Render (pause mode) | `src/render_described.py` | no | works |
 
@@ -86,17 +86,36 @@ Backends: `bedrock` (default), `bedrock-legacy` (bedrock-runtime InvokeModel —
 try this if the Mantle endpoint rejects the request signature), `claude` (local
 CLI; currently cannot refresh OAuth non-interactively).
 
-### Still needed: an AWS account with Bedrock access
+Backends in priority order: `bedrock` -> `anthropic` (first-party Claude API,
+needs `ANTHROPIC_API_KEY`) -> `bedrock-legacy` -> `claude` (local CLI, currently
+cannot refresh OAuth non-interactively).
 
-`tools/preflight.sh` currently reports:
+### Bedrock is blocked on this account — diagnosed, not guessed
 
 ```
 Error 002: Access to Bedrock models is not allowed for this account
 ```
 
-Configure the hackathon AWS account as a **named profile** and enable Bedrock
-model access for Claude in its console. Do not run this against unrelated
-credentials that happen to be on the machine — use a dedicated profile.
+What was ruled out:
+
+| Checked | Result |
+|---|---|
+| Wrong account | No — CLI authenticates as the same account shown in the console |
+| Wrong region | No — identical in us-east-1, us-west-2, ap-south-1, eu-central-1 |
+| Model-specific | No — Opus 5, Sonnet 5, Haiku 4.5 and Sonnet 4.5 all identical |
+| Needs an inference profile | No — bare, `us.` and `global.` prefixes all identical |
+| Organization SCP | No — the account is not a member of an organization |
+| IAM permissions | No — that returns `AccessDeniedException`, not `ValidationException` |
+| Other AWS services | **S3, Polly and Transcribe all work** — Bedrock alone is refused |
+
+`get-foundation-model-availability` reports `authorizationStatus: AUTHORIZED`,
+`entitlementAvailability: AVAILABLE`, `regionAvailability: AVAILABLE`, and
+`agreementAvailability: NOT_AVAILABLE`.
+
+So this is account state that only AWS can change — creating an IAM user cannot
+fix it. Raise it with AWS Support (Bedrock model agreement unavailable despite
+being authorized and entitled), and check the account has a valid payment
+method. Meanwhile use the `anthropic` backend.
 
 ## Scoring caveat
 
@@ -105,9 +124,16 @@ The fixture's author cannot also be its judge. The model has no access to
 the salience rule faithfully — not whether the rule generalises. That second
 question is answered by real footage and by blind testers, not by this fixture.
 
-## Audio format
+## Speech and audio format
 
-Speech is rendered to **16-bit 48 kHz stereo interleaved PCM**, which is what
+**Amazon Polly**, generative engine, falling back to neural where a voice or
+region lacks it, and to macOS `say` with `SIGHTLINE_TTS=say`. Polly is the
+default for three reasons: it is portable (`say` is macOS-only, and this project
+has to build on another machine), the generative voices are better, and it
+returns PCM natively. It also keeps an AWS service in the build while Bedrock is
+blocked.
+
+Output is **16-bit 48 kHz stereo interleaved PCM**, which is what
 `AudioPlaybackStream.writeAsync()` takes on Vega. Never MP3 — all decoding
 happens here, never on the device. See `HANDOFF.md` and `probes/`.
 

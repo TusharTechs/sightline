@@ -13,6 +13,15 @@ PLAYBACK time, and speech is always rendered at a comfortable rate.
 """
 import argparse, json, os, re, subprocess, sys, tempfile
 
+# Local TLS inspection breaks the AWS SDK without a bundle containing the
+# machine's own chain; see tools/make-ca-bundle.sh. Harmless when absent.
+_CA = os.environ.get("SIGHTLINE_CA_BUNDLE", os.path.expanduser("~/.config/sightline-ca.pem"))
+if os.path.exists(_CA):
+    for _v in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"):
+        os.environ.setdefault(_v, _CA)
+if os.environ.get("SIGHTLINE_AWS_PROFILE"):
+    os.environ["AWS_PROFILE"] = os.environ["SIGHTLINE_AWS_PROFILE"]
+
 RATE_HZ = 48000
 CHANNELS = 2
 BYTES_PER_FRAME = CHANNELS * 2   # s16
@@ -20,7 +29,10 @@ BYTES_PER_FRAME = CHANNELS * 2   # s16
 # Comfortable description rate. Deliberately NOT raised to fit more in — the
 # whole point is that speeding up speech over sped-up content is unintelligible.
 DEFAULT_WPM = 170
-DEFAULT_VOICE = "Samantha"
+DEFAULT_VOICE = "Samantha"        # macOS `say`
+POLLY_VOICE = "Joanna"            # supports the generative engine
+POLLY_REGION = os.environ.get("AWS_REGION", "us-east-1")
+POLLY_PCM_HZ = 16000              # Polly's pcm output is 16-bit mono, <=16kHz
 
 
 def budget_words(gap_seconds: float, playback_rate: float, wpm: int = DEFAULT_WPM) -> int:
@@ -33,15 +45,7 @@ def budget_words(gap_seconds: float, playback_rate: float, wpm: int = DEFAULT_WP
     return max(0, int(wall_clock * (wpm / 60.0)))
 
 
-def synthesize(text: str, out_pcm: str, wpm: int = DEFAULT_WPM, voice: str = DEFAULT_VOICE):
-    with tempfile.TemporaryDirectory() as td:
-        aiff = os.path.join(td, "s.aiff")
-        subprocess.run(["say", "-v", voice, "-r", str(wpm), "-o", aiff, text], check=True)
-        subprocess.run([
-            "ffmpeg", "-y", "-loglevel", "error", "-i", aiff,
-            "-ar", str(RATE_HZ), "-ac", str(CHANNELS),
-            "-f", "s16le", "-acodec", "pcm_s16le", out_pcm,
-        ], check=True)
+def _finish(out_pcm, text, wpm, voice, engine):
     n = os.path.getsize(out_pcm)
     return {
         "path": out_pcm,
@@ -50,8 +54,63 @@ def synthesize(text: str, out_pcm: str, wpm: int = DEFAULT_WPM, voice: str = DEF
         "words": len(re.findall(r"\S+", text)),
         "wpm": wpm,
         "voice": voice,
+        "engine": engine,
         "format": f"s16le {RATE_HZ}Hz {CHANNELS}ch interleaved",
     }
+
+
+def synthesize_polly(text: str, out_pcm: str, wpm: int = DEFAULT_WPM,
+                     voice: str = POLLY_VOICE, engine: str = "generative"):
+    """Amazon Polly. Portable (macOS `say` is not) and better quality.
+
+    Polly returns 16-bit mono PCM at up to 16 kHz; ffmpeg resamples to the
+    48 kHz stereo the Vega AudioPlaybackStream expects. Rate is set with SSML
+    prosody rather than a words-per-minute figure, so `wpm` here only scales
+    that — the authoritative length is the measured duration below.
+    """
+    import boto3
+    rate_pct = max(50, min(200, round(100 * wpm / DEFAULT_WPM)))
+    ssml = f'<speak><prosody rate="{rate_pct}%">{text}</prosody></speak>'
+    polly = boto3.client("polly", region_name=POLLY_REGION)
+    try:
+        audio = polly.synthesize_speech(
+            Text=ssml, TextType="ssml", Engine=engine, VoiceId=voice,
+            OutputFormat="pcm", SampleRate=str(POLLY_PCM_HZ))["AudioStream"].read()
+    except Exception:
+        if engine == "generative":          # not every voice/region has it
+            return synthesize_polly(text, out_pcm, wpm, voice, "neural")
+        raise
+    with tempfile.TemporaryDirectory() as td:
+        raw = os.path.join(td, "p.pcm")
+        open(raw, "wb").write(audio)
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-f", "s16le", "-ar", str(POLLY_PCM_HZ), "-ac", "1", "-i", raw,
+            "-ar", str(RATE_HZ), "-ac", str(CHANNELS),
+            "-f", "s16le", "-acodec", "pcm_s16le", out_pcm,
+        ], check=True)
+    return _finish(out_pcm, text, wpm, voice, f"polly:{engine}")
+
+
+def synthesize_say(text: str, out_pcm: str, wpm: int = DEFAULT_WPM, voice: str = DEFAULT_VOICE):
+    with tempfile.TemporaryDirectory() as td:
+        aiff = os.path.join(td, "s.aiff")
+        subprocess.run(["say", "-v", voice, "-r", str(wpm), "-o", aiff, text], check=True)
+        subprocess.run([
+            "ffmpeg", "-y", "-loglevel", "error", "-i", aiff,
+            "-ar", str(RATE_HZ), "-ac", str(CHANNELS),
+            "-f", "s16le", "-acodec", "pcm_s16le", out_pcm,
+        ], check=True)
+    return _finish(out_pcm, text, wpm, voice, "say")
+
+
+def synthesize(text: str, out_pcm: str, wpm: int = DEFAULT_WPM, voice: str = None,
+               engine: str = None):
+    """Dispatch to Polly (default, portable) or macOS `say` (offline fallback)."""
+    engine = engine or os.environ.get("SIGHTLINE_TTS", "polly")
+    if engine == "say":
+        return synthesize_say(text, out_pcm, wpm, voice or DEFAULT_VOICE)
+    return synthesize_polly(text, out_pcm, wpm, voice or POLLY_VOICE)
 
 
 def main():
@@ -62,7 +121,8 @@ def main():
     s.add_argument("text")
     s.add_argument("--out", required=True)
     s.add_argument("--wpm", type=int, default=DEFAULT_WPM)
-    s.add_argument("--voice", default=DEFAULT_VOICE)
+    s.add_argument("--voice")
+    s.add_argument("--engine", choices=["polly", "say"])
 
     b = sub.add_parser("budget", help="words that fit a gap at a playback rate")
     b.add_argument("--gap", type=float, required=True)
@@ -71,7 +131,7 @@ def main():
 
     a = p.parse_args()
     if a.cmd == "say":
-        print(json.dumps(synthesize(a.text, a.out, a.wpm, a.voice), indent=2))
+        print(json.dumps(synthesize(a.text, a.out, a.wpm, a.voice, a.engine), indent=2))
     else:
         print(json.dumps({
             "gap_media_s": a.gap, "playback_rate": a.rate,

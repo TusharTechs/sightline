@@ -129,8 +129,8 @@ def _client(flavour="mantle"):
     return _clients[flavour]
 
 
-def judge_bedrock(before_png, after_png, max_words=14, effort=None, flavour="mantle"):
-    """Judge one change with Claude on Bedrock.
+def _judgement_request(before_png, after_png, max_words):
+    """The request both backends send.
 
     Structured output is used rather than prompting for JSON, so a malformed
     reply is impossible and the salience field is always a real boolean —
@@ -156,26 +156,45 @@ def judge_bedrock(before_png, after_png, max_words=14, effort=None, flavour="man
                                      "data": _b64(after_png)}},
         {"type": "text", "text": PROMPT.format(rule=RULE, max_words=max_words)},
     ]
-    kwargs = dict(
-        model=BEDROCK_MODEL,
+    return dict(
         max_tokens=16000,
         thinking={"type": "adaptive"},
         messages=[{"role": "user", "content": content}],
         output_format=Judgement,
     )
+
+
+def judge_bedrock(before_png, after_png, max_words=14, effort=None, flavour="mantle"):
+    kwargs = _judgement_request(before_png, after_png, max_words)
+    kwargs["model"] = BEDROCK_MODEL
     if effort:
         kwargs["output_config"] = {"effort": effort}
-    resp = _client(flavour).messages.parse(**kwargs)
-    return resp.parsed_output.model_dump()
+    return _client(flavour).messages.parse(**kwargs).parsed_output.model_dump()
 
 
 def judge_bedrock_legacy(before_png, after_png, max_words=14, effort=None):
     return judge_bedrock(before_png, after_png, max_words, effort, flavour="legacy")
 
 
+def judge_anthropic(before_png, after_png, max_words=14, effort=None):
+    """First-party Claude API. Same request shape as Bedrock, different client.
+
+    Used while this AWS account cannot reach Bedrock. Needs ANTHROPIC_API_KEY.
+    """
+    import anthropic
+    if "anthropic" not in _clients:
+        _clients["anthropic"] = anthropic.Anthropic()
+    kwargs = _judgement_request(before_png, after_png, max_words)
+    kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+    if effort:
+        kwargs["output_config"] = {"effort": effort}
+    return _clients["anthropic"].messages.parse(**kwargs).parsed_output.model_dump()
+
+
 BACKENDS = {
     "bedrock": judge_bedrock,
     "bedrock-legacy": judge_bedrock_legacy,
+    "anthropic": judge_anthropic,
     "claude": judge_claude_cli,
 }
 
@@ -193,7 +212,8 @@ def run(frames_dir, changes_json, fps, backend="bedrock", max_words=14, limit=No
         cb, ca = crop_pair(bp, ap, e["bbox"])
         try:
             verdict = (judge(cb, ca, max_words, effort)
-                       if backend.startswith("bedrock") else judge(cb, ca, max_words))
+                       if backend.startswith(("bedrock", "anthropic"))
+                       else judge(cb, ca, max_words))
         except Exception as ex:
             verdict = {"changed": "", "salient": None, "reason": f"ERROR: {ex}",
                        "description": ""}
@@ -221,8 +241,10 @@ def main():
     a = p.parse_args()
     res = run(a.frames_dir, a.changes_json, a.fps, a.backend, a.max_words, a.limit,
               a.effort)
-    json.dump({"backend": a.backend, "model": BEDROCK_MODEL if a.backend == "bedrock"
-               else "claude-cli", "effort": a.effort, "results": res},
+    model = (BEDROCK_MODEL if a.backend.startswith("bedrock")
+             else os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+             if a.backend == "anthropic" else "claude-cli")
+    json.dump({"backend": a.backend, "model": model, "effort": a.effort, "results": res},
               open(a.out, "w"), indent=2)
     print(f"{len(res)} judged -> {a.out}", file=sys.stderr)
 
