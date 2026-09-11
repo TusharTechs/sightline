@@ -679,68 +679,59 @@ it is the API developers use precisely to avoid this situation.
 
 ---
 
-## FL-013 — An unavailable audio sink is reported as `MEDIA_ERR_SRC_NOT_SUPPORTED`
+## FL-013 — `vega device run-cmd` runs sandboxed, so platform diagnostics silently return misleading results
 
-**Severity:** High
+**Severity:** Medium
 
-**Task attempted.** Play audio from a Vega app on the Vega Virtual Device — the
-core requirement for an audio-description feature, and the subject of the
-platform's own "Audio-Only Playback Example".
+**Task attempted.** Determine whether the device's audio subsystem was healthy,
+independently of my application, while debugging FL-012.
 
-**Steps taken.** After several days of application-level debugging (see FL-012),
-tested the platform's audio path directly from the device shell, below the
-application layer entirely:
+**Steps taken.** Ran platform-level probes through `vega device run-cmd`:
 
 ```
 gst-launch-1.0 audiotestsrc num-buffers=100 ! audioconvert ! novaaudiosink
-gst-launch-1.0 audiotestsrc num-buffers=100 ! audioconvert ! alsasink
-gst-launch-1.0 videotestsrc num-buffers=30  ! videoconvert ! keplervideosink
+ls -la /dev/snd
+ps aux | grep -i audio
 ```
 
-**Expected.** A failure in the audio subsystem should be reported as a failure
-in the audio subsystem.
+**Expected.** Either a working audio pipeline, or a failure that reflects the
+actual state of the device.
 
-**Actual.** Every audio sink fails. `novaaudiosink`, the platform's own sink,
-reports `Audio stream creation failed - HW sink is disconnected or AudioServer
-is unavailable`. `alsasink` reports no such device. `pulsesink` has no runtime
-directory. `/dev/snd` does not exist, although the guest kernel enumerates the
-virtio-snd card in `/proc/asound/cards`. The video sink `keplervideosink` reaches
-PLAYING normally, so the failure is specific to audio.
+**Actual.** All three report, in effect, that the device has no audio:
 
-Because `playbin` builds and prerolls its sink *before* opening the source, this
-surfaces at the JavaScript layer as `MEDIA_ERR_SRC_NOT_SUPPORTED` with **no HTTP
-request ever issued** — an error that points at the media URL rather than at the
-audio subsystem, and sends the developer in entirely the wrong direction.
+- `novaaudiosink` → `Audio stream creation failed - HW sink is disconnected or
+  AudioServer is unavailable`
+- `/dev/snd` → `No such file or directory`
+- no audio daemons in the process list
 
-**Workaround.** Unconfirmed. Community topic 29106 reports the same class of
-failure recovering after a **host macOS reboot** — a VVD restart was not
-sufficient — which suggests the wedged state lives partly on the host. Note that
-`keplerscript-audio-lib` targets the same AudioServer, so the low-level audio API
-is not an alternative while it is unavailable.
+**All three are wrong.** The device's audio works — the boot animation plays an
+audible chime on the host, and `animationservice` logs `Audio Focus 1 is granted`
+and `initial audio frame presented to hardware` sixty seconds before the
+`novaaudiosink` probe above failed on the same boot.
 
-**Actionable suggestion.** Three things, in order of value:
+The cause is that `vega device run-cmd` executes as `uid=5000(app_user)` inside a
+sandbox with no Vega component instance, no audio focus session and no
+manifest-granted service access. The shell cannot reach the audio server, and
+every probe reports that as the device lacking audio rather than as the caller
+lacking access.
 
-1. **State it in the documentation.** If the virtual device ships without an
-   audio backend, say so on the media-player pages and in the virtual device
-   documentation. The audio-only example in `media-player-select-playback`
-   currently cannot run on the only target most external developers have, and
-   nothing indicates this.
-2. **Make the error name the real cause.** Surfacing an unavailable audio sink as
-   `MEDIA_ERR_SRC_NOT_SUPPORTED` is actively misleading — it reads as a codec or
-   URL problem. Even a log line naming the sink failure would collapse this from
-   days to minutes. This is the single most expensive diagnostic gap encountered
-   in this project.
-3. **Give developers a way to recover the audio subsystem.** The VVD's audio
-   path can enter a state that a device reboot does not clear, and
-   `virtual-device start` exposes no audio option (`--gui`, `--gl-accel`,
-   `--displayRes`, `--timeout`, `--vvdPath` only). A documented reset — or a
-   health check in `vega project doctor` — would prevent this recurring.
+**Workaround.** Do not trust `vega device run-cmd` for platform-state questions.
+Verify against observable device behaviour (audible output, `animationservice`
+log lines) instead.
 
-**Meta-observation, and the most useful thing in this entry.** I had already
-listed "missing audio hardware" as an *eliminated* hypothesis in my bug report,
-because `/proc/asound/cards` shows the card. Enumerating a card and being able
-to open it are different things, and the misleading error made the wrong
-conclusion feel safe. A one-line platform diagnostic —
-`gst-launch-1.0 audiotestsrc ! audioconvert ! novaaudiosink`, ten seconds, no app
-— separates "audio subsystem is wedged" from "application problem" instantly, and
-belongs in the media troubleshooting documentation.
+**Actionable suggestion.** Two things:
+
+1. **Say what context the shell runs in.** `vega device shell` and
+   `vega device run-cmd` should state on connection that the session is a
+   sandboxed app context, not a system shell. Nothing in the CLI help or the
+   debugging documentation mentions it, and `id` is not the first thing a
+   developer thinks to run.
+2. **Distinguish "unavailable to you" from "unavailable".** `AudioServer is
+   unavailable` is produced by a running audio server refusing an unprivileged
+   caller. A permission-denied path that says so would prevent the wrong
+   conclusion entirely.
+
+**What this cost.** I concluded from these three probes that the virtual device
+had no audio output at all, and nearly filed that as a root cause on a bug report
+Amazon engineers were already working. The device had been playing an audible
+boot chime the whole time.
