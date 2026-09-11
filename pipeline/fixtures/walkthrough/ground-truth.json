@@ -1,0 +1,26 @@
+{
+  "name": "notification-settings",
+  "duration": 11.0,
+  "note": "Scene state is a pure function of t, so these timings are exact. Salience follows the ADP-list rule: a change matters when it changes what you can do next.",
+  "events": [
+    { "t": 1.0, "what": "focus ring moves onto the 'Enable notifications' row",
+      "salient": false, "reason": "highlight movement is decoration; nothing new is possible" },
+    { "t": 2.0, "what": "'Enable notifications' checkbox becomes ticked",
+      "salient": true,  "reason": "state change — the setting is now on" },
+    { "t": 3.0, "what": "'Notification sound' dropdown changes from disabled to enabled",
+      "salient": true,  "reason": "a control that could not be used now can be" },
+    { "t": 4.0, "what": "tooltip appears over the sound info icon",
+      "salient": false, "reason": "transient decoration" },
+    { "t": 5.0, "what": "tooltip disappears, focus ring moves to the sound dropdown",
+      "salient": false, "reason": "decoration" },
+    { "t": 6.0, "what": "the settings list scrolls down",
+      "salient": false, "reason": "scrolling reveals existing content; nothing changed state" },
+    { "t": 7.0, "what": "'Save changes' button changes from disabled to enabled",
+      "salient": true,  "reason": "a new action is now available" },
+    { "t": 8.0, "what": "a confirmation dialog opens over a blocking overlay",
+      "salient": true,  "reason": "modal — nothing else will respond until it is dealt with" },
+    { "t": 9.5, "what": "the dialog closes and a 'Settings saved' status appears",
+      "salient": true,  "reason": "state change — the operation completed" }
+  ],
+  "counts": { "salient": 5, "decoration": 4 }
+}
