@@ -6,6 +6,59 @@
 
 ---
 
+## Update — 12 September 2026: MSE plays, URL mode does not, in the same app
+
+A controlled contrast that should localise this precisely. **The player, the
+decoders, the sinks and the surface are all fine.** Only URL-mode source
+handling fails.
+
+Same app, same device, same session, same source footage. The only difference is
+how the bytes reach the player:
+
+| Path | HTTP request issued? | Result |
+|---|---|---|
+| URL mode — `player.src = "<url>"` | **none, ever** | `MEDIA_ERR_SRC_NOT_SUPPORTED` |
+| MSE — `fetch()` then `SourceBuffer.appendBuffer()` | yes — 3,995,867 bytes, confirmed in the server access log | `canplay` → `playing`, audio audible |
+
+MSE sequence, with no Shaka/hls.js/dash.js involved — raw `MediaSource`:
+
+```
+isTypeSupported("video/mp4; codecs=\"avc1.64001F,mp4a.40.2\")  -> true
+sourceopen -> addSourceBuffer ok -> fetched 3995867 bytes
+-> appendBuffer -> updateend -> endOfStream
+-> loadedmetadata -> canplay -> playing        (audio audible on the host)
+```
+
+### Two hypotheses this kills
+
+1. **It is not the audio track.** I expected `playbin` to construct an audio
+   sink during preroll, so that a file carrying audio would fail where a
+   video-only file succeeded. Tested both in URL mode: identical failure,
+   `loadstart` then code 4. Both also play fine over MSE.
+2. **It is not the surface handle.** Following the documented URL-mode pattern
+   exactly — `initialize()` resolved before `setSurfaceHandle()`, handle cached
+   from `onSurfaceViewCreated` — the surface attaches successfully and the
+   failure comes afterwards.
+
+### And `fetch()` works from the app
+
+The probe reports its progress by `fetch()`-ing the host, and downloads the
+media the same way. So the app has working HTTP. URL mode issuing **no request
+at all** is therefore a fault inside the platform's URL handling rather than a
+networking problem in my environment.
+
+### What would help
+
+Given MSE works, the question narrows to: what happens between `player.src = url`
+and the source element being opened, such that it fails and returns
+`MEDIA_ERR_SRC_NOT_SUPPORTED` without issuing a request and without emitting a
+single `W3CMEDIA` log line at `debug`?
+
+**I am unblocked** — my app will use MSE — so please treat this as diagnosis
+rather than escalation. Working probes for both paths are available if useful.
+
+---
+
 ## Update — 11 September 2026: raw PCM playback works in the same app
 
 A controlled contrast that should narrow this considerably. **Audio output from
