@@ -69,6 +69,31 @@ Three capabilities, in priority order:
    "what is she wearing?" — answered from the frames. Impossible with a
    pre-recorded track; this is the LLM-native capability.
 
+**Playback goes through MSE, not URL mode.** Settled by experiment on
+12 September 2026. URL mode (`player.src = url`) fails on the virtual device for
+every media type without issuing a network request; MSE (`MediaSource` +
+`SourceBuffer.appendBuffer`) plays the same footage with audible audio. See
+`probes/`.
+
+Consequences for the build:
+
+- **Content must be fragmented.** MSE needs fragmented MP4, HLS or DASH — a
+  plain MP4 will not append. Fragment with
+  `ffmpeg -i in.mp4 -c copy -movflags +frag_keyframe+empty_moov+default_base_moof out.mp4`.
+  Demo footage has to be prepared this way.
+- **The app fetches its own bytes**, which is an advantage here rather than a
+  cost: the description pipeline already needs frames, and owning the fetch
+  makes buffering and seek behaviour ours to control.
+- A JS player (Shaka/hls.js/dash.js) is only needed for adaptive streaming or
+  DRM. For demo content, raw `MediaSource` is enough and avoids the Vega-patched
+  `dist` build process entirely.
+- **Description audio stays on `keplerscript-audio-lib`** as a separate
+  `USAGE_ACCESSIBILITY` stream, which ducks the film automatically. The two
+  paths are independent, which is why the project was never fully blocked.
+
+**The full architecture is now demonstrated on device:** film plays via MSE,
+description plays concurrently as PCM through the accessibility stream.
+
 **Describe the change, not the frame.** The sharpest input received so far, from
 a blind accessibility professional on the ADP list, about software walkthroughs:
 *"A walkthrough needs you to describe what changed, not what's there. Describe the
