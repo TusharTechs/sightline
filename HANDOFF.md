@@ -126,6 +126,39 @@ So the register control is really a **mode**, not a slider:
 Settle this early — it changes what the player has to do, not just what the
 generator writes.
 
+**Ranking is fixed, and depth is what varies with speed.** The answer to "more
+changes than gaps", from the same source on the ADP list, and it corrects the
+first implementation directly:
+
+> *"Take the ranking off the clock. Right now what survives is whichever change
+> a gap happened to land near, and that's why the answer moves when the speed
+> moves. Rank the changes first, then let the gaps decide how far down the list
+> you get. Same order every time. More of it at 1x, less of it at 2x. I can live
+> with less. What I can't live with is a different story at a different speed."*
+
+So the design is:
+
+1. **Rank every salient change by the salience rule itself**, applied honestly.
+   His warning is that an honest pass thins the list: *"Run your five through
+   that honestly and I doubt you still have five."*
+2. **Tie-break: the change the viewer caused beats the change that merely
+   happened.** *"I clicked something and I'm waiting to hear it took. That's the
+   one I need."* Confirmation of the viewer's own action outranks everything.
+3. **Fill gaps down the ranked list until they run out.** Speed changes the
+   depth reached, never the order.
+4. **Signal what was dropped with a short non-speech tone in the gap**, not with
+   words. *"Don't spend words telling me something got skipped. Words are the
+   thing you haven't got. Use a sound... it costs you a fraction of a second, it
+   tells me there was more, and I can go back for it if I care."*
+
+The principle behind all four: *"At 2x I already know I'm trading detail for
+speed. I'm not owed everything. I'm owed knowing what I traded."*
+
+This replaces first-fit assignment, which was letting arithmetic decide what a
+blind viewer learns — at 1x the sound setting was described, at 1.5x and 2x the
+Save button instead. Same content, different story. That is the specific defect
+he is naming.
+
 **Evaluate by task, not by taste.** Also from the same source, and it is the
 test protocol *and* the demo structure: *"Don't ask us whether the description is
 good. Ask us to do the task. Play the walkthrough and ask what we'd click next.
