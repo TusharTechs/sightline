@@ -679,7 +679,7 @@ it is the API developers use precisely to avoid this situation.
 
 ---
 
-## FL-013 — The Vega Virtual Device has no working audio output, and this is documented nowhere
+## FL-013 — An unavailable audio sink is reported as `MEDIA_ERR_SRC_NOT_SUPPORTED`
 
 **Severity:** High
 
@@ -697,9 +697,8 @@ gst-launch-1.0 audiotestsrc num-buffers=100 ! audioconvert ! alsasink
 gst-launch-1.0 videotestsrc num-buffers=30  ! videoconvert ! keplervideosink
 ```
 
-**Expected.** The virtual device is presented as the standard development target
-— physical hardware is explicitly not required for the hackathon — so a
-documented audio example should run on it.
+**Expected.** A failure in the audio subsystem should be reported as a failure
+in the audio subsystem.
 
 **Actual.** Every audio sink fails. `novaaudiosink`, the platform's own sink,
 reports `Audio stream creation failed - HW sink is disconnected or AudioServer
@@ -713,9 +712,11 @@ surfaces at the JavaScript layer as `MEDIA_ERR_SRC_NOT_SUPPORTED` with **no HTTP
 request ever issued** — an error that points at the media URL rather than at the
 audio subsystem, and sends the developer in entirely the wrong direction.
 
-**Workaround.** None on the virtual device. `keplerscript-audio-lib` targets the
-same unavailable AudioServer, so the low-level audio API cannot substitute.
-Audio must be rendered off-device, or on physical hardware.
+**Workaround.** Unconfirmed. Community topic 29106 reports the same class of
+failure recovering after a **host macOS reboot** — a VVD restart was not
+sufficient — which suggests the wedged state lives partly on the host. Note that
+`keplerscript-audio-lib` targets the same AudioServer, so the low-level audio API
+is not an alternative while it is unavailable.
 
 **Actionable suggestion.** Three things, in order of value:
 
@@ -729,9 +730,17 @@ Audio must be rendered off-device, or on physical hardware.
    URL problem. Even a log line naming the sink failure would collapse this from
    days to minutes. This is the single most expensive diagnostic gap encountered
    in this project.
-3. **Enable audio on the virtual device, or expose a flag.** `virtual-device
-   start` accepts `--gui`, `--gl-accel`, `--displayRes`, `--timeout` and
-   `--vvdPath`, but nothing for audio. Accessibility audio behaviour —
-   `USAGE_ACCESSIBILITY`, ducking, audio focus — is currently unverifiable
-   without physical hardware, which contradicts the position that hardware is
-   not required.
+3. **Give developers a way to recover the audio subsystem.** The VVD's audio
+   path can enter a state that a device reboot does not clear, and
+   `virtual-device start` exposes no audio option (`--gui`, `--gl-accel`,
+   `--displayRes`, `--timeout`, `--vvdPath` only). A documented reset — or a
+   health check in `vega project doctor` — would prevent this recurring.
+
+**Meta-observation, and the most useful thing in this entry.** I had already
+listed "missing audio hardware" as an *eliminated* hypothesis in my bug report,
+because `/proc/asound/cards` shows the card. Enumerating a card and being able
+to open it are different things, and the misleading error made the wrong
+conclusion feel safe. A one-line platform diagnostic —
+`gst-launch-1.0 audiotestsrc ! audioconvert ! novaaudiosink`, ten seconds, no app
+— separates "audio subsystem is wedged" from "application problem" instantly, and
+belongs in the media troubleshooting documentation.

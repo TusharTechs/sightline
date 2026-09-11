@@ -6,17 +6,22 @@
 
 ---
 
-## ROOT CAUSE FOUND — 11 September 2026 (follow-up update)
+## UPDATE — 11 September 2026: no audio sink can be created on this device
 
-**The Vega Virtual Device has no working audio output path. No application-level
-code can play audio on it, via any API.** This fully explains every symptom in
-this report, including the two failing samples, and it is reproducible in three
-commands without building an app.
+**Correction to my own report first.** In the eliminated-hypotheses table in §3 I
+listed *"Missing audio hardware"* as ruled out, on the grounds that
+`/proc/asound/cards` shows the virtio-snd card. **That elimination was wrong and
+I'd ask you to disregard it.** The card is enumerated, but nothing can open it.
+That row is the one that should have stayed open, and I'm sorry for pointing the
+investigation away from it.
 
-### The three-command reproduction
+Testing the audio path directly from the device shell, below the application
+layer entirely: **every audio sink on this device fails to initialise, including
+the platform's own.**
+
+### Reproduction — three commands, no app required
 
 ```
-$ vega virtual-device start
 $ vega device run-cmd -c "gst-launch-1.0 audiotestsrc num-buffers=100 ! audioconvert ! novaaudiosink"
 
 novaaudiosink.c:834:nova_audio_sink_prepare: error: Failed to initialize audio stream
@@ -25,28 +30,21 @@ novaaudiosink.c:834:nova_audio_sink_prepare: error: Audio stream creation failed
 ERROR: pipeline doesn't want to preroll.
 ```
 
-`novaaudiosink` is the platform's own audio sink. It cannot create a stream.
-
-**Every other audio sink fails as well:**
-
 | Sink | Result |
 |---|---|
 | `novaaudiosink` (platform) | `Audio stream creation failed - HW sink is disconnected or AudioServer is unavailable` |
 | `alsasink` | `Playback open error on device 'default': No such file or directory` |
 | `autoaudiosink` → `pulsesink` | `Failed to create secure directory (/run/user/108/pulse): No such file or directory` |
 
-**By contrast, the platform video sink works:**
+**The video sink works normally on the same device**, so this is specific to
+audio rather than to GStreamer, the image, or my app:
 
 ```
 $ vega device run-cmd -c "gst-launch-1.0 videotestsrc num-buffers=30 ! videoconvert ! keplervideosink"
 Setting pipeline to PLAYING ...          # no error
 ```
 
-So the failure is specific to audio, not to GStreamer, the image, or my app.
-
 ### Device state
-
-The guest kernel enumerates the virtio-snd card, but no device nodes are created:
 
 ```
 $ vega device run-cmd -c "cat /proc/asound/cards"
@@ -60,58 +58,69 @@ $ vega device run-cmd -c "ls -la /dev/snd"
 ls: /dev/snd: No such file or directory
 ```
 
-No audio server process is visible from the app context, and
-`vega virtual-device start --help` exposes no option to enable audio
-(`--gui`, `--gl-accel`, `--displayRes`, `--timeout`, `--vvdPath` only).
+The guest kernel enumerates the card, but there are no device nodes, and no
+audio server process is visible from the app context. (Caveat: the shell runs as
+`uid=5000(app_user)` in a sandbox, so `/dev` and the process table may be
+namespaced — I can't fully distinguish "absent" from "not visible to me".)
 
 ### Why this produces `MEDIA_ERR_SRC_NOT_SUPPORTED` with no HTTP request
 
-This resolves the central puzzle of the original report — why `.src` failed with
-code 4 while **zero HTTP requests** reached the server.
+This resolves the central puzzle of the original report.
 
 GStreamer's `playbin` constructs and prerolls the full pipeline, **including the
-sink**, before the source element opens its URI. Audio sink construction fails,
-the pipeline never reaches PAUSED, and the generic failure surfaces to JavaScript
-as `MEDIA_ERR_SRC_NOT_SUPPORTED`. The source is never opened, so no fetch is ever
-issued and no `W3CMEDIA` source-handling log lines are emitted.
+sink**, before the source element opens its URI. If sink construction fails, the
+pipeline never reaches PAUSED, and the failure surfaces to JavaScript as
+`MEDIA_ERR_SRC_NOT_SUPPORTED`. The source is never opened, so no fetch is issued
+and no `W3CMEDIA` source-handling lines are logged.
 
-That is consistent with every observation in this report:
+That is consistent with every observation in this report: `canPlayType()`
+returning `"probably"` (codec support is real; the failure is downstream, at the
+sink); no HTTP request for any URL, local or remote; no `W3CMEDIA` lines at
+`debug`; identical failure for MP3, M4A and WAV; and `vega-audio-sample` failing
+on the same device.
 
-- `canPlayType()` returns `"probably"` for `audio/mpeg` — codec support is real;
-  the failure is downstream of format negotiation, at the sink.
-- No HTTP request is issued for any URL, local or remote.
-- No `W3CMEDIA` log lines appear at `debug` priority.
-- `vega-audio-sample` (audio-only) fails on the same device.
-- The error is identical for MP3, M4A and WAV — it is not format-related.
+It also suggests `com.amazon.media.server` is never contacted simply because the
+pipeline dies first — so that line of enquiry can probably be closed.
 
-**Please disregard the `manifest.toml` service-declaration line of enquiry.** The
-declarations match `media-player-setup` exactly; `com.amazon.media.server` is
-never contacted because the pipeline fails before reaching it.
+### Relationship to topic 29106
 
-### Questions this raises
+This looks like a more severe form of what @atsushiyago reports in
+[[Vega 0.24 / VVD] Audio-only URL playback eventually fails with MEDIA_ERR_SRC_NOT_SUPPORTED (code 4)](https://community.amazondeveloper.com/t/vega-0-24-vvd-audio-only-url-playback-eventually-fails-with-media-err-src-not-supported-code-4/29106),
+and I withdraw my earlier suggestion that they are unrelated problems.
 
-1. **Is VVD audio expected to work at all?** If the virtual device ships without
-   an audio backend, that is a significant documented limitation rather than a
-   bug — but it is currently documented nowhere, and the audio-only example in
-   `media-player-select-playback` cannot run on the only hardware most external
-   developers have.
-2. **If it is supposed to work, what starts the AudioServer?** It is not running
-   and there is no CLI flag for it.
-3. **Does this also explain `vega-video-sample`?** A normal MP4 has an audio
-   track, so `playbin` will construct an audio sink for it and fail during
-   preroll. (The dual `RCT-folly` SIGSEGV in that sample looks like a separate
-   defect.)
-4. **Is any accessibility audio behaviour — `USAGE_ACCESSIBILITY`, ducking,
-   audio focus — testable on the virtual device?** This is the question that
-   determines whether external developers can build accessibility audio features
-   without physical hardware.
+In that thread, playback works and degrades over VVD uptime; a VVD restart
+sometimes fails to recover it, and **a host macOS reboot did recover it**. That
+is a strong hint that the wedged state lives partly on the host side rather than
+in the guest image. My device appears to be stuck in the terminal version of the
+same state: it fails from a clean VVD boot, on every attempt, and fails deeper in
+the stack — no sink can be created at all, so `W3CMEDIA` never begins pipeline
+construction, whereas in 29106 it does.
 
-### Impact
+I have not yet tried a host reboot; I'll report back after testing that.
 
-Audio cannot be rendered on the Vega Virtual Device by any means — not
-`react-native-w3cmedia`, and not `keplerscript-audio-lib`, which targets the
-same unavailable AudioServer. For a developer without physical hardware, every
-audio feature is unverifiable.
+### Suggested diagnostic
+
+`gst-launch-1.0 audiotestsrc ! audioconvert ! novaaudiosink` takes about ten
+seconds, needs no app, and distinguishes "audio subsystem is wedged" from
+"application or media problem" immediately. It may be worth asking anyone
+reporting a code 4 on VVD to run it first.
+
+### The two questions that would unblock me
+
+1. **What brings the AudioServer back, short of a host reboot?** If there is a
+   way to restart it on the device, or a state directory on the host to clear,
+   that is the fix for both threads.
+2. **Is any accessibility audio behaviour — `USAGE_ACCESSIBILITY`, ducking,
+   audio focus — verifiable on the VVD when audio is healthy?** My project is
+   entirely audio behaviour, so this determines whether I can build without
+   physical hardware.
+
+### Aside: the error message itself
+
+Surfacing an unavailable audio sink as `MEDIA_ERR_SRC_NOT_SUPPORTED` sent me
+several days in the wrong direction — it reads as a codec or URL problem, and I
+eliminated the correct hypothesis because of it. A log line naming the sink
+failure would have collapsed this to minutes.
 
 ---
 
@@ -338,7 +347,7 @@ here the backend appears never to be reached at all.
 | Manifest declarations | Diffed against `vega-audio-sample`; this app declares a superset of its media modules |
 | Emulator audio disabled | Instance `config.ini` has no `hw.audioOutput` line, but resolved `hardware-qemu.ini` shows `hw.audioOutput = true` |
 | Device networking | `nslookup` resolves; `gst-launch-1.0 souphttpsrc` from the device shell fetches the same URL successfully and reaches EOS |
-| Missing audio hardware | `/proc/asound/cards` → `virtio-snd - VirtIO SoundCard`; `/proc/asound/pcm` → `VirtIO PCM 0 : playback 4 : capture 2` |
+| ~~Missing audio hardware~~ **RETRACTED — see the update at the top of this report.** The card is enumerated in `/proc/asound/cards`, but `/dev/snd` does not exist and no audio sink can be opened. This elimination was incorrect. | ~~`/proc/asound/cards` → `virtio-snd - VirtIO SoundCard`; `/proc/asound/pcm` → `VirtIO PCM 0 : playback 4 : capture 2`~~ |
 
 ---
 
