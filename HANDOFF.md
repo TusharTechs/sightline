@@ -138,6 +138,34 @@ the ADP mailing list put it best: *"On a movie I want craft. On a training video
 I want to know what's on the screen, and I'll take plain over beautiful every
 time."* Build a register control, not just a verbosity slider.
 
+**Description audio goes through `keplerscript-audio-lib`, not w3cmedia.**
+Settled by experiment on 11 September 2026, and it is an architectural decision,
+not a workaround. `AudioPlaybackStream.writeAsync(pcm)` with
+`CONTENT_TYPE_SPEECH` + `USAGE_ACCESSIBILITY` produces audible output on the
+Virtual Device today, while `AudioPlayer.src` (w3cmedia URL Mode) fails with
+`MEDIA_ERR_SRC_NOT_SUPPORTED` and is parked with Amazon. See `probes/`.
+
+It is also the better fit on the merits:
+
+- **`USAGE_ACCESSIBILITY` ducks media automatically** — confirmed by Amazon
+  (Ivy) as the intended, documented behaviour. That is exactly the mix Sightline
+  needs, for free.
+- **`setDuckingPolicy(EXPLICIT)` + `duckVolumeAsync()`** gives per-stream control
+  when the automatic curve isn't right.
+- **Raw PCM means no decoder latency and frame-accurate timing** — which the gap
+  budgeting and the 1x/1.5x/2x speed requirement both depend on. Feeding TTS
+  output as PCM we control sample-exactly is strictly better than handing a URL
+  to a media element and hoping.
+- It needs no media server, so the description channel is independent of the
+  bug that is currently blocking film playback.
+
+Practical consequence: the TTS stage must emit **16-bit PCM, 48 kHz, stereo,
+interleaved** (the format the platform sink reports as supported), not MP3. Do
+any decoding host-side or in the pipeline, never on the device.
+
+w3cmedia is still needed for the *film*. The description channel is not blocked
+on it.
+
 **Do not optimise for voice beauty.** Research and user feedback both say
 description quality and user control matter far more than TTS naturalness.
 

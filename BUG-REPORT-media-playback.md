@@ -6,6 +6,81 @@
 
 ---
 
+## Update — 11 September 2026: raw PCM playback works in the same app
+
+A controlled contrast that should narrow this considerably. **Audio output from
+this app works.** The failure is confined to the w3cmedia media pipeline.
+
+I built a second probe in the *same* generated project — same `manifest.toml`,
+same device, same session, same `helloWorld` base — that synthesises a 440 Hz
+sine in JavaScript and writes it straight to an `AudioPlaybackStream` as raw
+16-bit PCM via `@amazon-devices/keplerscript-audio-lib`:
+
+```ts
+const builder = new AudioPlaybackStreamBuilder();
+builder.setAudioConfig({
+  sampleRate: AudioSampleRate.SAMPLE_RATE_48_KHZ,
+  channelMask: AudioChannelMask.CHANNEL_STEREO,
+  format:     AudioSampleFormat.FORMAT_PCM_16_BIT,
+});
+builder.setAudioAttributes({
+  contentType: AudioContentType.CONTENT_TYPE_SPEECH,
+  usage:       AudioUsageType.USAGE_ACCESSIBILITY,
+  flags:       AudioFlags.FLAG_NONE,
+});
+const stream = await builder.buildAsync();
+await stream.startAsync();
+await stream.writeAsync(pcmArrayBuffer);
+```
+
+**This is audible on the host.** No network, no file, no container, no codec, no
+decoder, no media server.
+
+| Probe (same project, same manifest, same device) | Result |
+|---|---|
+| `keplerscript-audio-lib` → `AudioPlaybackStream.writeAsync()` | **Audible tone** |
+| `react-native-w3cmedia` → `AudioPlayer.src` (URL Mode) | `MEDIA_ERR_SRC_NOT_SUPPORTED`, no HTTP request issued |
+
+### What this rules out
+
+- The app **is** granted audio access and **does** get a working audio focus
+  session — `USAGE_ACCESSIBILITY` at that.
+- `com.amazon.audio.stream` and `com.amazon.audio.control` are reachable from
+  this app with its current manifest.
+- The device's audio output path is healthy end to end. (Independently
+  confirmed: the boot animation's chime is audible, and `animationservice` logs
+  `Audio Focus 1 is granted` / `initial audio frame presented to hardware` on
+  every boot.)
+
+So the remaining fault is inside the w3cmedia path specifically — consistent
+with the original observation that `com.amazon.media.server` is never contacted
+and no `W3CMEDIA` log lines are emitted at `debug`.
+
+### A correction to my own report
+
+Please **disregard the "Emulator audio disabled" and any audio-hardware line of
+enquiry** — device audio demonstrably works, and the "Missing audio hardware"
+row in my eliminated-hypotheses table was correct as filed.
+
+I also want to flag a diagnostic trap I fell into, in case it saves someone else
+the same day: probes run through `vega device run-cmd` execute as
+`uid=5000(app_user)` in a sandbox with no component instance and no focus
+session. From there, `gst-launch-1.0 audiotestsrc ! novaaudiosink` reports
+`AudioServer is unavailable`, `/dev/snd` appears absent, and no audio daemons
+appear in `ps` — **all three are misleading**; the audio server is running fine
+and simply refuses the unprivileged caller. I nearly filed that as a root cause.
+A permission-denied path that says so would prevent the wrong conclusion.
+
+### Suggested next step for whoever picks this up
+
+Given PCM playback works and URL Mode does not, the question is narrowed to why
+`AudioPlayer.src` fails before the source is opened. Is there anything in the
+w3cmedia → media server handshake that can fail silently and return
+`MEDIA_ERR_SRC_NOT_SUPPORTED` without emitting a `W3CMEDIA` log line, even at
+`debug` with the rate limit raised?
+
+---
+
 ## Bug Description
 
 ### 1. Summary
