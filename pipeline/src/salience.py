@@ -270,3 +270,51 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# Budget-aware rewriting.
+#
+# A description written without knowing its gap cannot be made to fit by
+# speaking faster — that is the failure the ADP list reviewer described, where a line that
+# sits neatly in a gap at 1x lands on the narrator at 2x. The gap has to
+# constrain the writing, so the word budget feeds back into generation here.
+# Text-only: the change has already been identified, so this needs no images.
+# ---------------------------------------------------------------------------
+
+SHORTEN_PROMPT = """A blind viewer is watching a video. Something changed on screen:
+
+{changed}
+
+There is a gap in the narration exactly long enough for {max_words} words.
+Write what to say aloud, in AT MOST {max_words} words.
+
+Keep what changed and what it means for what the viewer can do now. Drop
+everything else — colour, position, styling, names of controls that do not
+matter. If {max_words} words cannot carry the meaning, say the single most
+important thing. Plain spoken words, no UI jargon."""
+
+
+def describe_at_budget(changed, max_words, backend="anthropic"):
+    from pydantic import BaseModel, Field
+
+    class Line(BaseModel):
+        description: str = Field(description=f"at most {max_words} words")
+
+    kwargs = dict(
+        max_tokens=2000,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content":
+                   SHORTEN_PROMPT.format(changed=changed, max_words=max_words)}],
+        output_format=Line,
+    )
+    if backend.startswith("bedrock"):
+        kwargs["model"] = BEDROCK_MODEL
+        client = _client("legacy" if backend.endswith("legacy") else "mantle")
+    else:
+        import anthropic
+        if "anthropic" not in _clients:
+            _clients["anthropic"] = anthropic.Anthropic()
+        client = _clients["anthropic"]
+        kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+    return client.messages.parse(**kwargs).parsed_output.description

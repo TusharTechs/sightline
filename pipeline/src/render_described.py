@@ -16,7 +16,7 @@ uses raw PCM via AudioPlaybackStream instead; this renderer is for review.
 """
 import argparse, json, os, shutil, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from speech import synthesize, RATE_HZ
+from speech import synthesize, budget_words, RATE_HZ
 
 W, H, FPS = 1280, 720, 8
 VENC = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", "-r", str(FPS)]
@@ -46,6 +46,90 @@ def seg_freeze(src, t, wav, dur, out):
     os.unlink(still)
 
 
+def render_fit(a, events):
+    """Fit-the-gaps: never pause, place each description in a silence.
+
+    The clip is rendered AT the requested playback rate, and the description
+    audio is laid in unmodified at 1x. That is the whole point — at 2x a 2.6s
+    media gap is 1.3s of wall clock, and the description has to be short enough
+    to fit that, not merely time-compressed to fit it. Speeding the speech up
+    with the film makes it fit arithmetically and unintelligible in practice.
+    """
+    gaps = json.load(open(a.gaps))["gaps"]
+    rate = a.rate
+    tmp = tempfile.mkdtemp()
+    placed, dropped = [], []
+    try:
+        # source, sped up; description audio is NOT sped up
+        base = os.path.join(tmp, "base.mp4")
+        run(["ffmpeg", "-y", "-loglevel", "error", "-i", a.video,
+             "-filter_complex",
+             f"[0:v]setpts=PTS/{rate}[v];[0:a]atempo={rate}[aa]",
+             "-map", "[v]", "-map", "[aa]", *VENC, *AENC, base])
+
+        used, inputs, filters = set(), ["-i", base], []
+        for i, e in enumerate(events):
+            t = float(e["t"])
+            # Assignment is decided in fit_descriptions.py and carried here, so
+            # the two stages cannot disagree about which silence a line belongs
+            # in. Fall back to first-fit only for hand-written inputs.
+            if "gap_index" in e:
+                gi = e["gap_index"]
+                gap = gaps[gi] if 0 <= gi < len(gaps) else None
+            else:
+                gap = next((g for j, g in enumerate(gaps)
+                            if j not in used and g["end"] > t), None)
+                gi = gaps.index(gap) if gap else None
+            if gap is None:
+                dropped.append({**e, "why": "no gap at or after this moment"})
+                continue
+            avail_wall = gap["len_s"] / rate
+            budget = budget_words(gap["len_s"], rate)
+
+            pcm = os.path.join(tmp, f"d{i}.pcm")
+            meta = synthesize(e["description"], pcm)
+            if meta["duration_s"] > avail_wall:
+                dropped.append({**e, "why": f"needs {meta['duration_s']}s, "
+                                f"gap gives {round(avail_wall,3)}s at {rate}x",
+                                "word_budget": budget,
+                                "words": meta["words"]})
+                continue
+            used.add(gi)
+            wav = os.path.join(tmp, f"d{i}.wav")
+            run(["ffmpeg", "-y", "-loglevel", "error", "-f", "s16le",
+                 "-ar", str(RATE_HZ), "-ac", "2", "-i", pcm, wav])
+            at_wall = gap["start"] / rate
+            inputs += ["-i", wav]
+            n = len(filters) + 1
+            filters.append(f"[{n}]adelay={int(at_wall*1000)}|{int(at_wall*1000)}[x{n}]")
+            placed.append({"source_t": round(t, 3), "spoken_at_s": round(at_wall, 3),
+                           "gap_media_s": gap["len_s"],
+                           "gap_wall_s": round(avail_wall, 3),
+                           "word_budget": budget, "words": meta["words"],
+                           "speech_s": meta["duration_s"],
+                           "description": e["description"]})
+
+        if filters:
+            mix = "".join(f"[x{i+1}]" for i in range(len(filters)))
+            fc = ";".join(filters) + f";[0:a]{mix}amix=inputs={len(filters)+1}:" \
+                 f"duration=first:normalize=0[a]"
+            run(["ffmpeg", "-y", "-loglevel", "error", *inputs,
+                 "-filter_complex", fc, "-map", "0:v", "-map", "[a]",
+                 "-c:v", "copy", *AENC, a.out])
+        else:
+            run(["ffmpeg", "-y", "-loglevel", "error", "-i", base, "-c", "copy", a.out])
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    side = os.path.splitext(a.out)[0] + ".timeline.json"
+    json.dump({"mode": "fit", "playback_rate": rate,
+               "placed": placed, "dropped": dropped}, open(side, "w"), indent=2)
+    print(f"{a.out}  rate={rate}x  placed={len(placed)}  dropped={len(dropped)}")
+    for d in dropped:
+        print(f"   DROPPED t={d['t']}  {d['why']}")
+    return
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("video")
@@ -54,16 +138,21 @@ def main():
     p.add_argument("--out", required=True)
     p.add_argument("--wpm", type=int, default=170)
     p.add_argument("--lead", type=float, default=0.25,
-                   help="seconds of held frame before speech starts")
+                   help="pause mode: seconds of held frame before speech starts")
+    p.add_argument("--gaps", help="fit mode: detect_gaps.py output")
+    p.add_argument("--rate", type=float, default=1.0,
+                   help="fit mode: playback rate to render and budget for")
     a = p.parse_args()
-
-    if a.mode == "fit":
-        sys.exit("fit-the-gaps mode needs gap detection on a real soundtrack — not yet built")
 
     events = json.load(open(a.events_json))
     events = sorted([e for e in events if e.get("description")], key=lambda e: e["t"])
     if not events:
         sys.exit("no events with a description")
+
+    if a.mode == "fit":
+        if not a.gaps:
+            sys.exit("fit mode needs --gaps (run src/detect_gaps.py first)")
+        return render_fit(a, events)
 
     dur = float(subprocess.run(
         ["ffprobe", "-v", "error", "-show_entries", "format=duration",

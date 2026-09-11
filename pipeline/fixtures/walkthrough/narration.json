@@ -1,0 +1,9 @@
+{
+  "note": "A narrator talking over the walkthrough, with deliberate gaps of known length. This is the 'fit the gaps' test case: descriptions must land in the gaps and must not step on the narrator — at 1x, 1.5x and 2x.",
+  "segments": [
+    { "t": 0.0, "text": "Let's set up notifications for this device." },
+    { "t": 4.2, "text": "I'll turn them on, and pick a sound." },
+    { "t": 9.0, "text": "And that's it, the settings are saved." }
+  ],
+  "expected_gaps_note": "Gaps fall between the spoken segments; detect_gaps.py measures the real ones from the rendered audio."
+}

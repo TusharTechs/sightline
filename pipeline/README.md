@@ -27,7 +27,9 @@ Description Project list, and all architectural rather than cosmetic:
 | 2+3. Salience + description | `src/salience.py` | **yes** | scaffolded; blocked on a model backend |
 | 4. Speech + word budget | `src/speech.py` | no | works — Amazon Polly (generative), `say` fallback |
 | 5. Evaluation | `src/evaluate.py` | no | works |
-| 6. Render (pause mode) | `src/render_described.py` | no | works |
+| 1b. Gap detection | `src/detect_gaps.py` | no | works |
+| 3b. Fit to gap budget | `src/fit_descriptions.py` | **yes** | works |
+| 6. Render (pause + fit) | `src/render_described.py` | no | works |
 
 The gate is deliberately sensitive and dumb. Diff magnitude is a terrible
 salience proxy — a scroll changes nearly every pixel and means nothing, a ticked
@@ -146,9 +148,39 @@ Output is **16-bit 48 kHz stereo interleaved PCM**, which is what
 `AudioPlaybackStream.writeAsync()` takes on Vega. Never MP3 — all decoding
 happens here, never on the device. See `HANDOFF.md` and `probes/`.
 
+## Fit-the-gaps: what the speed test actually showed
+
+Descriptions are rewritten to the gap they will live in, then **synthesised and
+measured** — the budget is an estimate, the rendered duration is the truth, and
+the line shrinks until it genuinely fits. Nothing is time-compressed to fit;
+speeding speech up over sped-up content is the failure being avoided.
+
+Measured on the narrated fixture (2 usable gaps, 5 salient changes):
+
+| rate | delivered | line 1 | line 2 |
+|---|---|---|---|
+| 1x | 2 of 5 | "Checkbox now checked" | "Notification sound is now available to choose" |
+| 1.5x | 2 of 5 | "Now checked" | "Save changes now available" |
+| 2x | 2 of 5 | "Now checked" | "Save now available" |
+
+Two findings worth carrying into the product:
+
+1. **Only 2 of 5 salient changes can be delivered at all.** Three have no
+   silence to live in. Fit-the-gaps does not degrade gracefully into
+   completeness — it silently drops information, and the viewer is never told.
+2. **Which information survives changes with playback rate.** At 1x the sound
+   setting gets described; at 1.5x and 2x it is dropped and the Save button is
+   described instead. Same content, different facts delivered. That is a
+   product decision currently being made by an arithmetic accident, and it
+   should be made on purpose — priority ordering on changes, not first-fit.
+
+The speaking rate is **calibrated, not assumed** (`src/speech.py calibrate`).
+The first implementation guessed 170 wpm and every line overflowed; the voice
+actually delivers 203 wpm once Polly's padding is trimmed, and the padding was
+the dominant error.
+
 ## Not built yet
 
-- **Fit-the-gaps mode.** Needs silence detection on a real soundtrack. The word
-  budget it depends on (`speech.budget_words`) is done and speed-aware.
+- **Priority ordering** when there are more changes than gaps (see above).
 - **Interactive questions** mid-playback.
 - **Companion phone channel.**
