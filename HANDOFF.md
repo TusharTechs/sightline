@@ -184,6 +184,38 @@ blind viewer learns — at 1x the sound setting was described, at 1.5x and 2x th
 Save button instead. Same content, different story. That is the specific defect
 he is naming.
 
+**Gaps mean gaps in dialogue, not gaps in audio.** The single most consequential
+correction so far, found on 12 September 2026 by running the pipeline against
+real footage instead of a synthetic fixture.
+
+The first gap detector looked for silence. On the Sintel trailer that finds
+**2.5 seconds of usable space in 52 seconds** — everything else is continuous
+score — which would mean film description is essentially impossible. That
+conclusion is obviously wrong: human describers talk over music and effects
+constantly. What they do not talk over is dialogue.
+
+Detecting *speech* instead, via Amazon Transcribe word timings, and treating
+everything else as available:
+
+| method | usable time in a 52s trailer |
+|---|---|
+| silence detection | 2.5s |
+| speech detection | **42.9s** |
+
+Only 7.8s of that trailer is dialogue. The rest is describable. This is a 17x
+difference in how much can be said, and it came from checking an assumption
+against real content rather than a fixture we built ourselves.
+
+Consequences:
+
+- `src/detect_gaps.py` (silence) is kept only for content that genuinely is
+  narration-over-silence, such as the synthetic walkthrough fixture.
+  `src/detect_speech.py` is the one to use for anything real.
+- Transcribe also gives the dialogue text, which is useful context for writing
+  description that does not repeat what was just said aloud.
+- It is an AWS service doing real work in the pipeline, which matters for the
+  AWS Builder mini-challenge now that Bedrock is unavailable on this account.
+
 **Evaluate by task, not by taste.** Also from the same source, and it is the
 test protocol *and* the demo structure: *"Don't ask us whether the description is
 good. Ask us to do the task. Play the walkthrough and ask what we'd click next.
