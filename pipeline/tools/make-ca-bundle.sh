@@ -1,7 +1,7 @@
 #!/bin/bash
-# Builds a CA bundle that includes the machine's own trust store, so HTTPS to
-# AWS and PyPI works where the network terminates TLS with its own chain.
-# Without this the AWS API fails with CERTIFICATE_VERIFY_FAILED and pip times out.
+# Builds a certificate bundle from the machine's own trust store.
+# Some networks require this for HTTPS clients to validate correctly. Run it if
+# you see certificate errors from the AWS CLI or pip; skip it otherwise.
 set -euo pipefail
 OUT="${1:-$HOME/.config/sightline-ca.pem}"
 mkdir -p "$(dirname "$OUT")"

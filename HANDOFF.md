@@ -340,8 +340,6 @@ id = "com.amazon.network.privilege.net-info"
 ```
 
 **Not needed on the new machine:** the `~/.kepler/acr_pyvenv` workaround from
-FL-009 was only required because of TLS inspection on that network. On a
-clean network `acr-report` will bootstrap itself — though it still can't
 symbolicate without Midway.
 
 **Not needed at all:** the VVD's Settings → Amazon Account registration. Its own

@@ -347,7 +347,7 @@ crash-dump analysis.
 
 ---
 
-## FL-009 — Native crash symbolication is unavailable to external developers (requires Amazon-internal Midway auth)
+## FL-009 — Native crash symbolication is unavailable to external developers (requires Amazon-internal auth)
 
 **Severity:** High
 
@@ -361,68 +361,45 @@ or set the KEPLER_SDK_PATH environment variable"* — even with the SDK correctl
 installed and `vega --version` working. The MCP server does not inherit the
 environment established by `~/vega/env`, so it cannot locate SDK tools.
 
-**2. The CLI tool bootstraps its dependencies from PyPI at runtime, and fails
-behind TLS inspection.** `vega exec acr-report` pip-installs into a venv at
-`~/.kepler/acr_pyvenv` on each invocation. On a machine running the intercepting proxy — whose
-intercepting root CA is installed in the System keychain, as is
-standard for TLS-inspecting proxy deployments — every fetch fails:
+**2. The CLI tool bootstraps its dependencies from PyPI on every invocation.**
+`vega exec acr-report` pip-installs into a venv at `~/.kepler/acr_pyvenv` each
+time it runs, resolving one package per invocation — jinja2, then requests, then
+pyelftools, then urllib3, then boto3, then rich. On any machine where that
+install path is slow or restricted, the tool is unusable, and the failure looks
+like a crash-analysis problem rather than a packaging one. A crash-report tool
+should not need network access to start; vendor its dependencies, or ship them
+with the SDK.
 
-```
-SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED]
-certificate verify failed: self-signed certificate in certificate chain'))
-```
-
-Three things make this worse than a normal proxy problem:
-
-- **The standard workaround does not work.** `PIP_CERT`, `REQUESTS_CA_BUNDLE` and
-  `SSL_CERT_FILE`, all pointing at a valid bundle containing the local intercepting CA,
-  are ignored. The same bundle works correctly with the system `python3 -m pip`.
-- **Dependencies are resolved one per invocation** — jinja2, then requests, then
-  pyelftools, then urllib3, then boto3, then rich — so a developer patching this
-  by hand must run the tool repeatedly to discover each next missing package.
-- **The bundled venv is Python 3.10 while a current macOS system Python is 3.14**,
-  so offline wheels must be fetched with explicit
-  `--python-version 310 --only-binary=:all: --platform macosx_11_0_arm64`.
-  Without that, binary wheels install as `cp314` and are silently unusable.
-
-And the detail that best captures the problem: among the packages it tries to
-fetch is **`pip-system-certs`** — the package that would make pip trust the
-system certificate store. It cannot be installed, because pip does not trust the
-system certificate store.
-
-**3. Having got the tool running, symbolication is gated on Amazon-internal
-authentication.** After manually populating the venv offline, `acr-report` starts
-correctly and then stops here:
+**3. Symbolication is gated on Amazon-internal authentication.** Once the tool
+runs, it stops here:
 
 ```
 [sysroot_handler] - Downloading symbols this may take a few minutes...
 Midway cookie not found at ~/.midway/cookie, please authenticate using mwinit.
 ```
 
-Midway is Amazon's internal SSO and `mwinit` is an internal tool. **An external
-developer cannot authenticate, so native crash symbolication is not available to
-them at all.** Everything before this point is a nuisance; this is a wall.
+Midway is Amazon's internal SSO. `mwinit` is not available to external
+developers, and neither is the symbol server it authenticates against.
 
-**Workaround.** Read the ACR file directly — it is plain text and contains a
-`<minidump_stackwalk>` section listing modules and offsets. That was sufficient to
-diagnose FL-008 (two RCT-folly versions loaded in one process) without any
-symbols. Unsymbolicated, but genuinely usable, and far better than nothing.
+**Impact.** Every native crash is unsymbolicated for external developers. The
+stacks in FL-008 and the media bug report were read by hand out of the ACR
+files' `<minidump_stackwalk>` sections, giving library names and offsets but no
+function names. Diagnosing a native crash in a platform library is therefore
+effectively impossible from outside Amazon — which matters because two of the
+official media samples crash natively on a stock virtual device.
 
-**Actionable suggestion.** In priority order:
+**Workaround.** Read `<minidump_stackwalk>` directly from the ACR file. It gives
+the crash reason, the faulting thread, and loaded module names with offsets —
+enough to identify *which* libraries are involved (that is how the dual
+RCT-folly load in FL-008 was found), but not where in them.
 
-1. **Provide an external symbolication path.** Either publish debug symbols for
-   platform libraries alongside the SDK, or allow `acr-report` to source a debug
-   rootfs from the connected device. As it stands, a third-party developer whose
-   app crashes inside a platform library has no route to a symbolicated stack —
-   which for a native crash is most of the diagnostic value. If external
-   symbolication is genuinely not intended, say so in the docs rather than
-   shipping a tool that appears to work and then asks for internal credentials.
-2. **Vendor the Python dependencies into the SDK.** An offline-capable SDK should
-   not need PyPI to read a crash report. Failing that, honour `PIP_CERT` and
-   `REQUESTS_CA_BUNDLE`, and resolve all dependencies in one pass rather than one
-   per run.
-3. **Make the Builder Tools MCP server resolve SDK tool paths the way the CLI
-   does**, or document that it must be launched with `~/vega/env` sourced.
+**Actionable suggestion.** Provide a public symbol server for release builds, or
+ship debug symbols with the SDK for the platform libraries that appear in
+crashes. Failing that, an offline mode for `acr-report` that symbolicates
+against locally available symbols and says clearly which frames it cannot
+resolve would be far better than stopping at an authentication prompt an
+external developer can never satisfy. Also fix the MCP tool's SDK lookup, and
+vendor the tool's Python dependencies so it starts without network access.
 
 ---
 
