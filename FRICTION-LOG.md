@@ -676,3 +676,62 @@ the simulator or buying a device, and right now the docs present the VVD as a
 general-purpose development target. Separately, `canPlayType()` returning
 `"probably"` for a type the player will then refuse is a bug in its own right —
 it is the API developers use precisely to avoid this situation.
+
+---
+
+## FL-013 — The Vega Virtual Device has no working audio output, and this is documented nowhere
+
+**Severity:** High
+
+**Task attempted.** Play audio from a Vega app on the Vega Virtual Device — the
+core requirement for an audio-description feature, and the subject of the
+platform's own "Audio-Only Playback Example".
+
+**Steps taken.** After several days of application-level debugging (see FL-012),
+tested the platform's audio path directly from the device shell, below the
+application layer entirely:
+
+```
+gst-launch-1.0 audiotestsrc num-buffers=100 ! audioconvert ! novaaudiosink
+gst-launch-1.0 audiotestsrc num-buffers=100 ! audioconvert ! alsasink
+gst-launch-1.0 videotestsrc num-buffers=30  ! videoconvert ! keplervideosink
+```
+
+**Expected.** The virtual device is presented as the standard development target
+— physical hardware is explicitly not required for the hackathon — so a
+documented audio example should run on it.
+
+**Actual.** Every audio sink fails. `novaaudiosink`, the platform's own sink,
+reports `Audio stream creation failed - HW sink is disconnected or AudioServer
+is unavailable`. `alsasink` reports no such device. `pulsesink` has no runtime
+directory. `/dev/snd` does not exist, although the guest kernel enumerates the
+virtio-snd card in `/proc/asound/cards`. The video sink `keplervideosink` reaches
+PLAYING normally, so the failure is specific to audio.
+
+Because `playbin` builds and prerolls its sink *before* opening the source, this
+surfaces at the JavaScript layer as `MEDIA_ERR_SRC_NOT_SUPPORTED` with **no HTTP
+request ever issued** — an error that points at the media URL rather than at the
+audio subsystem, and sends the developer in entirely the wrong direction.
+
+**Workaround.** None on the virtual device. `keplerscript-audio-lib` targets the
+same unavailable AudioServer, so the low-level audio API cannot substitute.
+Audio must be rendered off-device, or on physical hardware.
+
+**Actionable suggestion.** Three things, in order of value:
+
+1. **State it in the documentation.** If the virtual device ships without an
+   audio backend, say so on the media-player pages and in the virtual device
+   documentation. The audio-only example in `media-player-select-playback`
+   currently cannot run on the only target most external developers have, and
+   nothing indicates this.
+2. **Make the error name the real cause.** Surfacing an unavailable audio sink as
+   `MEDIA_ERR_SRC_NOT_SUPPORTED` is actively misleading — it reads as a codec or
+   URL problem. Even a log line naming the sink failure would collapse this from
+   days to minutes. This is the single most expensive diagnostic gap encountered
+   in this project.
+3. **Enable audio on the virtual device, or expose a flag.** `virtual-device
+   start` accepts `--gui`, `--gl-accel`, `--displayRes`, `--timeout` and
+   `--vvdPath`, but nothing for audio. Accessibility audio behaviour —
+   `USAGE_ACCESSIBILITY`, ducking, audio focus — is currently unverifiable
+   without physical hardware, which contradicts the position that hardware is
+   not required.
