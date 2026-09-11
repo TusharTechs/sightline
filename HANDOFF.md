@@ -210,6 +210,50 @@ defensible framing, which is also true: description for content that has none an
 never will. Where a professional track exists, play it and get out of the way.
 Disclose synthetic voice in-product (ACB guidelines require it).
 
+
+## 3.a Competitive reality — checked 12 September 2026, not assumed
+
+**Do not claim this is new.** A search of the current landscape found that
+essentially every individual capability in Sightline already exists somewhere:
+
+| Capability | Prior art |
+|---|---|
+| AI-generated audio description | A crowded commercial field: Verbit, ScreenPal, Subly, Audible Sight, MediaScribe. Driven hard by ADA Title II deadlines starting April 2026. |
+| Interactive questions during playback | Published research: SPICA (2024), ViDscribe (2026 — AI description plus a conversational Q&A interface, with a longitudinal study of blind and low-vision participants), Describe Now (DIS 2025). YouDescribe lets viewers pause and ask. |
+| Real-time / live AI description | Patented (US 11736775, AI audio descriptions for live events). Emerging rather than shipped on TV platforms. |
+| Personal audio channel for co-viewing | Patented (US 11956497, US 10869073) and shipped — Actiview, now Spectrum Access. Cinemas solved this years ago. |
+
+An earlier version of this document claimed the per-viewer audio channel was an
+insight nobody had had. That was wrong, and this table exists so the mistake is
+not repeated in the submission.
+
+**What is actually defensible**, and what the submission should lead with:
+
+1. **Point of consumption, not point of production.** Every commercial tool
+   above is a service you send a catalogue to and get description tracks back
+   from. Sightline describes what is on the screen now, on the device, for
+   content nobody will ever pay to have described. The coverage gap is the
+   product — not the generation.
+2. **The design is grounded in a blind professional's requirements, and it
+   shows in the architecture.** Describe the change not the frame; a change
+   matters when it changes what you can do next; ranking fixed and depth varying
+   with speed; a tone rather than words for what was dropped. Those are not
+   polish, they are the structure, and they came from correspondence rather than
+   from guessing.
+3. **Speed-aware budgeting in playback time.** Not seen elsewhere in the tools
+   surveyed, and it falls directly out of how blind users actually listen.
+
+**Framing risk.** A judge who knows Audible Sight or Verbit will read "AI
+generates audio description" as derivative within one sentence. Lead with the
+coverage gap and the co-viewing case, and treat generation as the means.
+
+**Impact is not in question.** The need is real and the gap is large. It is
+novelty that must not be overclaimed — and per the ACB's published TTS
+guidance, never position this against human describers. The 78th Emmy Awards
+(14 September 2026) carried live human description by named professionals with
+writing support; that is the standard, it is well served, and it is not the
+market this addresses.
+
 ---
 
 ## 4. Architecture (settled, with the facts that forced each decision)
