@@ -384,3 +384,143 @@ def rank_changes(changes, backend="anthropic"):
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     return [r.model_dump()
             for r in client.messages.parse(**kwargs).parsed_output.ranked]
+
+
+# ---------------------------------------------------------------------------
+# Film mode.
+#
+# The salience rule as given — "a change matters when it changes what you can do
+# next" — is about software, where the viewer is the one acting. In drama the
+# viewer acts on nothing, so the sibling question is what they need in order to
+# FOLLOW what is happening. Same shape, different subject; kept explicitly
+# separate rather than stretched to cover both.
+#
+# The other half is restraint: the soundtrack is already telling the viewer a
+# great deal. Description that repeats the dialogue, or narrates what is
+# obvious from a sound effect, spends the one resource there is least of.
+# ---------------------------------------------------------------------------
+
+FILM_PROMPT = """You are writing audio description for a film, for a viewer who
+cannot see the screen. Two frames are given: the last moment that was described,
+and the moment you are about to speak.
+
+Describe what CHANGED between them that the viewer needs in order to follow the
+story.
+
+WORTH SAYING:
+- who is present, and who has left
+- where this is, when the location has changed
+- what someone did, physically, that matters
+- something revealed, found, destroyed, or handed over
+- a change in someone's visible state — hurt, afraid, disguised, transformed
+
+NOT WORTH SAYING:
+- camera movement, cuts, framing, lighting, or anything about how it was shot
+- mood or atmosphere in the abstract
+- anything the viewer already knows from the dialogue below
+- anything a sound effect has already made obvious
+- what characters are feeling, unless it is visible in what they do
+
+{dialogue_note}
+
+You have room for AT MOST {max_words} words. That is a hard limit and it is
+short on purpose — this has to fit in a gap between lines. Say the single most
+important thing plainly. Present tense. No narrator flourishes."""
+
+
+def describe_film_change(before_png, after_png, max_words, dialogue="",
+                         backend="anthropic"):
+    from pydantic import BaseModel, Field
+
+    class FilmCue(BaseModel):
+        changed: str = Field(description="what changed between the two frames")
+        worth_saying: bool = Field(
+            description="does the viewer need this to follow the story")
+        description: str = Field(
+            description=f"what to say aloud, at most {max_words} words; "
+                        f"empty if not worth saying")
+
+    note = (f"The dialogue spoken between these two moments was:\n\"{dialogue}\"\n"
+            f"Do not repeat any of it." if dialogue.strip()
+            else "No dialogue was spoken between these two moments.")
+
+    content = [
+        {"type": "text", "text": "LAST DESCRIBED MOMENT:"},
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                     "data": _b64(before_png)}},
+        {"type": "text", "text": "NOW:"},
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                     "data": _b64(after_png)}},
+        {"type": "text", "text": FILM_PROMPT.format(dialogue_note=note,
+                                                    max_words=max_words)},
+    ]
+    kwargs = dict(
+        max_tokens=16000,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": content}],
+        output_format=FilmCue,
+    )
+    if backend.startswith("bedrock"):
+        kwargs["model"] = BEDROCK_MODEL
+        client = _client("legacy" if backend.endswith("legacy") else "mantle")
+    else:
+        import anthropic
+        if "anthropic" not in _clients:
+            _clients["anthropic"] = anthropic.Anthropic()
+        client = _clients["anthropic"]
+        kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+    return client.messages.parse(**kwargs).parsed_output.model_dump()
+
+
+FILM_RANK_PROMPT = """These are the moments described in a film, in order. A blind
+viewer cannot see any of it, and at higher playback speeds there will not be
+time for all of them.
+
+Rank them by how much the viewer needs each one to follow what is happening.
+Rank 1 is the one they most need.
+
+Most needed: who someone is, where the story has moved to, what someone did
+that changes the situation, something revealed or lost.
+
+Least needed: titles, logos, credits and end cards. A viewer who misses those
+misses nothing about the story — they are the first thing to cut, not the last.
+Rank them at the bottom regardless of how much text they contain.
+
+Moments:
+{items}"""
+
+
+def rank_film_cues(cues, backend="anthropic"):
+    """Rank for film. The walkthrough criterion — what can you do next — does
+    not apply when the viewer is acting on nothing, and using it ranked a
+    trailer's end card above the protagonist's first appearance."""
+    from pydantic import BaseModel, Field
+
+    class Ranked(BaseModel):
+        index: int = Field(description="0-based index in the input list")
+        rank: int = Field(description="1 is most needed")
+        why: str = Field(description="one short clause")
+
+    class Ranking(BaseModel):
+        ranked: list[Ranked]
+
+    items = "\n".join(f"[{i}] at {c['t']}s — {c['changed']}" for i, c in enumerate(cues))
+    kwargs = dict(
+        max_tokens=8000,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": FILM_RANK_PROMPT.format(items=items)}],
+        output_format=Ranking,
+    )
+    if backend.startswith("bedrock"):
+        kwargs["model"] = BEDROCK_MODEL
+        client = _client("legacy" if backend.endswith("legacy") else "mantle")
+    else:
+        import anthropic
+        if "anthropic" not in _clients:
+            _clients["anthropic"] = anthropic.Anthropic()
+        client = _clients["anthropic"]
+        kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+    out = [r.model_dump() for r in client.messages.parse(**kwargs).parsed_output.ranked]
+    for r in out:
+        r["caused_by_viewer"] = False      # never applicable in film
+    return out
