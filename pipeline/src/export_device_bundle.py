@@ -13,7 +13,7 @@ story gets told.
 """
 import argparse, json, os, shutil, subprocess, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from salience import rank_changes, describe_at_budget
+from salience import rank_changes, rank_film_cues, describe_at_budget
 from speech import synthesize, budget_words
 
 
@@ -50,15 +50,28 @@ def main():
     a = p.parse_args()
 
     os.makedirs(a.out, exist_ok=True)
-    salient = [r for r in json.load(open(a.judged_json))["results"] if r.get("salient")]
+    raw = json.load(open(a.judged_json))
+
+    # Two producers feed this: the walkthrough path (salience.py -> judged.json,
+    # descriptions written later) and the film path (film_cues.py, descriptions
+    # already written to the gap they will live in). Normalise here rather than
+    # duplicating the exporter.
+    if "cues" in raw:
+        film = True
+        salient = [{"t_to": c["t"], "changed": c["changed"],
+                    "description": c["description"]} for c in raw["cues"]]
+    else:
+        film = False
+        salient = [r for r in raw["results"] if r.get("salient")]
     if not salient:
-        sys.exit("no salient changes in the judged file")
+        sys.exit("nothing describable in the input")
 
     gaps = json.load(open(a.gaps))["gaps"] if a.gaps else []
 
     print(f"ranking {len(salient)} changes...", file=sys.stderr)
-    order = rank_changes([{"t": c["t_to"], "changed": c["changed"]} for c in salient],
-                         a.backend)
+    payload = [{"t": c["t_to"], "changed": c["changed"]} for c in salient]
+    order = (rank_film_cues(payload, a.backend) if film
+             else rank_changes(payload, a.backend))
     order.sort(key=lambda r: r["rank"])
 
     media_name = "content.mp4"
@@ -70,13 +83,19 @@ def main():
         src = salient[r["index"]]
         # In fit mode the line is written to the gap it will live in; in pause
         # mode there is time, so completeness beats brevity.
-        if a.mode == "fit" and gaps:
+        if film:
+            # Already written to its gap by film_cues.py; rewriting would only
+            # lose the frame context that produced it.
+            text = src["description"]
+            words = len(text.split())
+        elif a.mode == "fit" and gaps:
             t = src["t_to"]
             gap = next((g for g in gaps if g["end"] > t), gaps[-1])
             words = max(2, budget_words(gap["len_s"], a.rate))
+            text = describe_at_budget(src["changed"], words, a.backend)
         else:
             words = 14
-        text = describe_at_budget(src["changed"], words, a.backend)
+            text = describe_at_budget(src["changed"], words, a.backend)
         pcm_name = f"desc-{r['rank']:02d}.pcm"
         meta = synthesize(text, os.path.join(a.out, pcm_name))
         cues.append({
