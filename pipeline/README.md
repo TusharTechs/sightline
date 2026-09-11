@@ -86,9 +86,18 @@ Backends: `bedrock` (default), `bedrock-legacy` (bedrock-runtime InvokeModel —
 try this if the Mantle endpoint rejects the request signature), `claude` (local
 CLI; currently cannot refresh OAuth non-interactively).
 
-Backends in priority order: `bedrock` -> `anthropic` (first-party Claude API,
-needs `ANTHROPIC_API_KEY`) -> `bedrock-legacy` -> `claude` (local CLI, currently
-cannot refresh OAuth non-interactively).
+Backends in priority order: `bedrock` -> `anthropic` (first-party Claude API)
+-> `bedrock-legacy` -> `claude` (local CLI, currently cannot refresh OAuth
+non-interactively).
+
+The `anthropic` backend reads `ANTHROPIC_API_KEY`, or a key file if one exists
+(`~/.config/sightline-anthropic-key`, override with `SIGHTLINE_API_KEY_FILE`).
+The file form keeps the key out of shell history and out of any terminal being
+shared:
+
+```bash
+umask 077 && printf %s "sk-ant-..." > ~/.config/sightline-anthropic-key
+```
 
 ### Bedrock is blocked on this account — diagnosed, not guessed
 

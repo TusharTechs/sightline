@@ -30,6 +30,16 @@ if os.path.exists(CA_BUNDLE):
     for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "AWS_CA_BUNDLE"):
         os.environ.setdefault(var, CA_BUNDLE)
 
+# Read the API key from a file if one is configured, so it never has to be
+# pasted into a terminal that is being shared or logged. chmod 600 it.
+_KEY_FILE = os.environ.get("SIGHTLINE_API_KEY_FILE",
+                           os.path.expanduser("~/.config/sightline-anthropic-key"))
+if not os.environ.get("ANTHROPIC_API_KEY") and os.path.exists(_KEY_FILE):
+    with open(_KEY_FILE) as _f:
+        _k = _f.read().strip()
+    if _k:
+        os.environ["ANTHROPIC_API_KEY"] = _k
+
 BEDROCK_MODEL = os.environ.get("SIGHTLINE_MODEL", "anthropic.claude-opus-5")
 BEDROCK_REGION = os.environ.get("AWS_REGION", "us-east-1")
 # Keep hackathon credentials separate from anything else on the machine:
@@ -129,7 +139,7 @@ def _client(flavour="mantle"):
     return _clients[flavour]
 
 
-def _judgement_request(before_png, after_png, max_words):
+def _judgement_request(before_png, after_png, max_words, scroll_dy=0):
     """The request both backends send.
 
     Structured output is used rather than prompting for JSON, so a malformed
@@ -156,6 +166,13 @@ def _judgement_request(before_png, after_png, max_words):
                                      "data": _b64(after_png)}},
         {"type": "text", "text": PROMPT.format(rule=RULE, max_words=max_words)},
     ]
+    if scroll_dy:
+        # A measured fact, not a verdict. The rule still decides.
+        content.insert(4, {"type": "text", "text": (
+            f"Measured: the content in this region moved vertically by "
+            f"{abs(scroll_dy)} pixels between the two frames. Anything that left "
+            f"or entered the view did so because the view moved, not because it "
+            f"was added or removed.")})
     return dict(
         max_tokens=16000,
         thinking={"type": "adaptive"},
@@ -164,19 +181,21 @@ def _judgement_request(before_png, after_png, max_words):
     )
 
 
-def judge_bedrock(before_png, after_png, max_words=14, effort=None, flavour="mantle"):
-    kwargs = _judgement_request(before_png, after_png, max_words)
+def judge_bedrock(before_png, after_png, max_words=14, effort=None, scroll_dy=0,
+                  flavour="mantle"):
+    kwargs = _judgement_request(before_png, after_png, max_words, scroll_dy)
     kwargs["model"] = BEDROCK_MODEL
     if effort:
         kwargs["output_config"] = {"effort": effort}
     return _client(flavour).messages.parse(**kwargs).parsed_output.model_dump()
 
 
-def judge_bedrock_legacy(before_png, after_png, max_words=14, effort=None):
-    return judge_bedrock(before_png, after_png, max_words, effort, flavour="legacy")
+def judge_bedrock_legacy(before_png, after_png, max_words=14, effort=None, scroll_dy=0):
+    return judge_bedrock(before_png, after_png, max_words, effort, scroll_dy,
+                         flavour="legacy")
 
 
-def judge_anthropic(before_png, after_png, max_words=14, effort=None):
+def judge_anthropic(before_png, after_png, max_words=14, effort=None, scroll_dy=0):
     """First-party Claude API. Same request shape as Bedrock, different client.
 
     Used while this AWS account cannot reach Bedrock. Needs ANTHROPIC_API_KEY.
@@ -184,7 +203,7 @@ def judge_anthropic(before_png, after_png, max_words=14, effort=None):
     import anthropic
     if "anthropic" not in _clients:
         _clients["anthropic"] = anthropic.Anthropic()
-    kwargs = _judgement_request(before_png, after_png, max_words)
+    kwargs = _judgement_request(before_png, after_png, max_words, scroll_dy)
     kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     if effort:
         kwargs["output_config"] = {"effort": effort}
@@ -211,7 +230,7 @@ def run(frames_dir, changes_json, fps, backend="bedrock", max_words=14, limit=No
         ap = os.path.join(frames_dir, f"f{ai:04d}.png")
         cb, ca = crop_pair(bp, ap, e["bbox"])
         try:
-            verdict = (judge(cb, ca, max_words, effort)
+            verdict = (judge(cb, ca, max_words, effort, e.get("scroll_dy", 0))
                        if backend.startswith(("bedrock", "anthropic"))
                        else judge(cb, ca, max_words))
         except Exception as ex:
