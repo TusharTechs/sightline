@@ -1,0 +1,86 @@
+schema-version = 1
+
+[package]
+title = "Basic UI React Native Application for project sightline"
+version = "0.1.0"
+id = "com.sightline.tv"
+
+[os.version]
+min = "1.2"
+target = "1.2"
+
+[needs]
+[[needs.module]]
+id = "/com.amazon.vega.os@IVega_1_2"
+
+# ---------------------------------------------------------------------------
+# Media + audio.
+# Missing services here fail SILENTLY (FL-002), and [needs] does not escalate
+# that (FL-014), so these are copied verbatim from media-player-setup rather
+# than trimmed by trial and error.
+# ---------------------------------------------------------------------------
+
+[[needs.module]]
+id = "/com.amazon.kepler.kepler_media_controls_1@IKeplerMediaControls_0"
+
+[[needs.module]]
+id = "/com.amazon.kepler.keplermediadescriptor_1@IKeplermediadescriptor_1"
+
+[[needs.module]]
+id = "/com.amazon.kepler.audio_lib_2@IAudioLib_0"
+
+[[needs.module]]
+id = "/com.amazon.kepler.keplerscript_4@IKeplerScript_0"
+
+[[needs.module]]
+id = "/com.amazon.kepler.w3cmedia_2@IW3cmedia_3"
+
+
+
+
+
+[wants]
+[[wants.service]]
+id = "com.amazon.media.server"
+
+[[wants.service]]
+id = "com.amazon.mediametrics.service"
+
+[[wants.service]]
+id = "com.amazon.media.playersession.service"
+
+[[wants.service]]
+id = "com.amazon.mediabuffer.service"
+
+[[wants.service]]
+id = "com.amazon.mediatransform.service"
+
+[[wants.service]]
+id = "com.amazon.gipc.uuid.*"
+
+# Required by keplerscript-audio-lib for the description stream.
+[[wants.service]]
+id = "com.amazon.audio.stream"
+
+[[wants.service]]
+id = "com.amazon.audio.control"
+
+[[wants.service]]
+id = "com.amazon.audio.system"
+
+[[wants.service]]
+id = "com.amazon.network.service"
+
+[[wants.privilege]]
+id = "com.amazon.devconf.privilege.accessibility"
+
+[offers]
+[[offers.service]]
+id = "com.amazon.gipc.uuid.*"
+
+[components]
+[[components.interactive]]
+id = "com.sightline.tv.main"
+runtime-module = "/com.amazon.kepler.runtime.react_native_kepler_4@IReactNativeKepler_0"
+launch-type = "singleton"
+categories = ["com.amazon.category.main"]
