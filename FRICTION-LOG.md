@@ -735,3 +735,61 @@ log lines) instead.
 had no audio output at all, and nearly filed that as a root cause on a bug report
 Amazon engineers were already working. The device had been playing an audible
 boot chime the whole time.
+
+---
+
+## FL-014 — `[needs.service]` is not enforced: a nonexistent required service installs and runs
+
+**Severity:** Medium
+
+**Task attempted.** Determine whether my app was actually being granted the media
+and audio services it declares — the open question behind FL-012, where the app
+fails to play audio while the device's own audio works.
+
+**Steps taken.** The manifest documentation distinguishes `[needs]` (required)
+from `[wants]` (optional). FL-002 established that a missing service under
+`[wants]` fails silently, so I promoted all nine media and audio services from
+`[[wants.service]]` to `[[needs.service]]`, expecting an ungranted service to
+surface as a loud install or launch failure.
+
+The build succeeded and the app installed. Before trusting that as evidence the
+services were granted, I ran a control — a service that cannot possibly exist:
+
+```toml
+[[needs.service]]
+id = "com.amazon.definitely.not.a.real.service"
+```
+
+**Expected.** A required service that does not exist should fail manifest
+validation, installation, or launch.
+
+**Actual.** All three succeed:
+
+```
+manifest.toml is valid
+manifest validation found 0 errors
+Installing/Updating '/tmp/sightlineprobe_aarch64.vpkg' ...success
+Sending: pkg://com.sightline.probe.main
+com.sightline.probe.main is running on ...
+```
+
+The app installs, launches and runs normally while declaring a required service
+that does not exist.
+
+**Consequence.** Combined with FL-002, there is currently **no way for a
+developer to detect a missing or ungranted service by any means**. `[wants]`
+fails silently by design; `[needs]` also fails silently, so the documented
+escalation path does not work. A service-related misconfiguration is
+undiagnosable from the app side, which is exactly the position I am in on FL-012
+— unable to confirm or rule out whether my app is being granted
+`com.amazon.audio.stream`.
+
+**Workaround.** None. Service grants cannot be verified from the application.
+
+**Actionable suggestion.** Enforce `[needs]` for services the way the
+documentation describes — refuse to install, or fail at launch naming the
+service. Failing that, validate service IDs against the platform's service
+registry at build time, where the manifest is already being parsed and validated
+(the build emits `manifest validation found 0 errors` for a manifest containing
+a fictional service). A `vega device installed-services` command, or service
+grant status in `vega project doctor`, would also close the gap.
