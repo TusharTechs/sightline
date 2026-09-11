@@ -63,20 +63,47 @@ python3 src/render_described.py fixtures/walkthrough/walkthrough.mp4 \
     out/reference-descriptions.json --mode pause --out out/walkthrough-described.mp4
 ```
 
-## Model backend — the open blocker
+## Model backend
 
-Neither path works from this machine yet:
+Bedrock, via the Anthropic SDK's `AnthropicBedrockMantle` client, on
+`anthropic.claude-opus-5` with adaptive thinking and structured outputs. The
+verdict is a typed object rather than parsed prose, so "the model replied in a
+shape we could not read" can never be scored as a salience decision.
 
-- **Bedrock** (the intended path, and it feeds the AWS Builder mini-challenge):
-  no credentials configured, and the AWS API is additionally unreachable because
-  of local TLS interception (`CERTIFICATE_VERIFY_FAILED`). Needs credentials for
-  the hackathon account plus an `AWS_CA_BUNDLE` that trusts the local chain.
-- **`claude` CLI**: `Failed to authenticate: OAuth session expired and could not
-  be refreshed` when invoked non-interactively.
+```bash
+tools/make-ca-bundle.sh                       # once
+export SIGHTLINE_CA_BUNDLE=~/.config/sightline-ca.pem
+export SIGHTLINE_AWS_PROFILE=sightline        # keep it off the default profile
+tools/preflight.sh                            # checks TLS, credentials, model access
+```
 
-Until one is fixed, stage 2+3 cannot be scored. Note also that the fixture's
-author cannot be its judge — the salience score is only meaningful from a model
-that has not seen `ground-truth.json`.
+`tools/make-ca-bundle.sh` exists because this machine's network terminates TLS
+with its own chain, which otherwise breaks both the AWS API
+(`CERTIFICATE_VERIFY_FAILED`) and `pip`. Building a bundle from the machine's own
+trust store fixes both. Harmless on a normal network.
+
+Backends: `bedrock` (default), `bedrock-legacy` (bedrock-runtime InvokeModel —
+try this if the Mantle endpoint rejects the request signature), `claude` (local
+CLI; currently cannot refresh OAuth non-interactively).
+
+### Still needed: an AWS account with Bedrock access
+
+`tools/preflight.sh` currently reports:
+
+```
+Error 002: Access to Bedrock models is not allowed for this account
+```
+
+Configure the hackathon AWS account as a **named profile** and enable Bedrock
+model access for Claude in its console. Do not run this against unrelated
+credentials that happen to be on the machine — use a dedicated profile.
+
+## Scoring caveat
+
+The fixture's author cannot also be its judge. The model has no access to
+`ground-truth.json`, so a score here measures whether the pipeline *implements*
+the salience rule faithfully — not whether the rule generalises. That second
+question is answered by real footage and by blind testers, not by this fixture.
 
 ## Audio format
 
