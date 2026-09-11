@@ -6,3 +6,4 @@ bug-artifacts/
 # pipeline working files
 pipeline/fixtures/**/frames/
 pipeline/out/*.pcm
+pipeline/.venv/
