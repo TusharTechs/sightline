@@ -216,6 +216,52 @@ Consequences:
 - It is an AWS service doing real work in the pipeline, which matters for the
   AWS Builder mini-challenge now that Bedrock is unavailable on this account.
 
+### Film mode: the rule, sharpened (ADP list, 12 September 2026)
+
+The adapted film rule was close but wrong in a way that matters, and the
+correction is now the design:
+
+**The test is not "what can I do next" — it is "will I be lost thirty seconds
+from now without this".**
+
+> *"In a film I'm not acting on anything, so the test isn't what I can do next.
+> It's whether I'll be lost thirty seconds from now without it."*
+
+**The tie-break is audibility, not causation.** This is the part the system was
+not equipped to do at all:
+
+> *"The change I can't hear beats the change I can. The soundtrack is already
+> doing half your job. A door, footsteps, a slap, a car pulling off, somebody
+> crying, I've got all of that and I don't need it said back to me. Spend the
+> gap on what's silent. Who else is in the room and hasn't spoken. What she's
+> carrying. Where she went while the score was up. A look that changes what the
+> next line means. That's what's invisible, and it's only invisible to me."*
+
+So the ranking criterion for film is **visual-only information**. A change that
+makes a noise is already delivered; describing it spends the scarcest resource
+on something the viewer already has.
+
+**Titles rank last, with one exception that is not a title at all.**
+
+> *"A card that gives a place, a date, or three years later, that isn't a title.
+> That's the story. Drop it and I'm lost for the next five minutes and I won't
+> know why."*
+
+**The "camera language" ban was right for the wrong reason.** The test is
+usability, not vocabulary:
+
+> *"It isn't that it's camera language. It's that I can't use it. She's crying,
+> I can use. Where the camera is sitting, I can't do anything with. Anything
+> that describes the filming instead of the film is the tell."*
+
+**Consequence for the pipeline.** Until this, the film path looked only at the
+picture — two frames plus the dialogue transcript. It had no knowledge of
+non-speech audio, so it could not tell a silent change from one the viewer
+already heard. `src/audio_events.py` adds that: onset and loudness analysis of
+the window being described, passed to the model as evidence. It detects *that*
+something was audible, not *what* it was, which is weaker than a semantic
+soundtrack model but enough to apply the rule.
+
 **Evaluate by task, not by taste.** Also from the same source, and it is the
 test protocol *and* the demo structure: *"Don't ask us whether the description is
 good. Ask us to do the task. Play the walkthrough and ask what we'd click next.

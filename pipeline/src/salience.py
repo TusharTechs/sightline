@@ -404,32 +404,42 @@ FILM_PROMPT = """You are writing audio description for a film, for a viewer who
 cannot see the screen. Two frames are given: the last moment that was described,
 and the moment you are about to speak.
 
-Describe what CHANGED between them that the viewer needs in order to follow the
-story.
+Describe what CHANGED between them.
 
-WORTH SAYING:
-- who is present, and who has left
-- where this is, when the location has changed
-- what someone did, physically, that matters
-- something revealed, found, destroyed, or handed over
-- a change in someone's visible state — hurt, afraid, disguised, transformed
+THE TEST, and it is the only one that matters:
+Will the viewer be lost thirty seconds from now without this? If not, say
+nothing. They are not acting on anything — this is not about what they can do,
+it is about whether they can still follow the story.
 
-NOT WORTH SAYING:
-- camera movement, cuts, framing, lighting, or anything about how it was shot
-- mood or atmosphere in the abstract
-- anything the viewer already knows from the dialogue below
-- anything a sound effect has already made obvious
-- what characters are feeling, unless it is visible in what they do
+WHAT TO SPEND THE GAP ON — what is SILENT.
+The soundtrack is already doing half the work. A door, footsteps, a slap, a car
+pulling away, someone crying: the viewer has all of that already and does not
+need it said back to them. Spend the words on what makes no sound:
+- who else is present and has not spoken
+- what someone is carrying, wearing, or holding
+- where someone went while the music was up
+- a look or gesture that changes what the next line means
+- something visible that contradicts what is being said
 
-{dialogue_note}
+WHAT NOT TO SAY:
+- anything the soundtrack already delivered (see the audio evidence below)
+- anything the dialogue already said
+- anything that describes the FILMING rather than the film. The test is not
+  whether it is camera vocabulary, it is whether the viewer can use it. "She is
+  crying" is usable. "Close on her face" is not — there is nothing they can do
+  with where the camera is sitting. Cuts, angles, framing, focus, lighting
+  setups: all unusable.
+- mood or atmosphere asserted rather than shown
 
-You have room for AT MOST {max_words} words. That is a hard limit and it is
-short on purpose — this has to fit in a gap between lines. Say the single most
-important thing plainly. Present tense. No narrator flourishes."""
+AUDIO EVIDENCE FOR THIS STRETCH:
+{audio_note}
+
+You have room for AT MOST {max_words} words. Hard limit, short on purpose —
+this has to fit between lines of dialogue. Present tense. Plain."""
 
 
 def describe_film_change(before_png, after_png, max_words, dialogue="",
-                         backend="anthropic"):
+                         backend="anthropic", audio_note=""):
     from pydantic import BaseModel, Field
 
     class FilmCue(BaseModel):
@@ -440,9 +450,11 @@ def describe_film_change(before_png, after_png, max_words, dialogue="",
             description=f"what to say aloud, at most {max_words} words; "
                         f"empty if not worth saying")
 
-    note = (f"The dialogue spoken between these two moments was:\n\"{dialogue}\"\n"
-            f"Do not repeat any of it." if dialogue.strip()
-            else "No dialogue was spoken between these two moments.")
+    if not audio_note:
+        audio_note = ("No audio analysis available — assume nothing was audible "
+                      "and prefer changes that are plainly visual.")
+        if dialogue.strip():
+            audio_note += f' Dialogue spoken: "{dialogue}" — do not repeat it.'
 
     content = [
         {"type": "text", "text": "LAST DESCRIBED MOMENT:"},
@@ -451,7 +463,7 @@ def describe_film_change(before_png, after_png, max_words, dialogue="",
         {"type": "text", "text": "NOW:"},
         {"type": "image", "source": {"type": "base64", "media_type": "image/png",
                                      "data": _b64(after_png)}},
-        {"type": "text", "text": FILM_PROMPT.format(dialogue_note=note,
+        {"type": "text", "text": FILM_PROMPT.format(audio_note=audio_note,
                                                     max_words=max_words)},
     ]
     kwargs = dict(
@@ -485,6 +497,11 @@ that changes the situation, something revealed or lost.
 Least needed: titles, logos, credits and end cards. A viewer who misses those
 misses nothing about the story — they are the first thing to cut, not the last.
 Rank them at the bottom regardless of how much text they contain.
+
+ONE EXCEPTION, and it is not a title at all: a card that gives a PLACE, a DATE,
+or an elapsed time such as "three years later" is story, not decoration. Drop it
+and the viewer is lost for the next five minutes without knowing why. Rank those
+with the story, near the top.
 
 Moments:
 {items}"""
