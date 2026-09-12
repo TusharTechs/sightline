@@ -15,6 +15,7 @@ import argparse, json, os, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from salience import describe_film_change
 from speech import budget_words, synthesize
+from audio_events import analyse, describe_for_prompt
 
 FRAME_WIDTH = 1280      # 1080p costs tokens for no benefit here
 # A long gap gets described more than once. Sixteen seconds of silence in a film
@@ -95,8 +96,12 @@ def main():
         grab(a.media, anchor, before)
         grab(a.media, g["start"], after)
         spoken = dialogue_between(None, items, anchor, g["start"]) if items else ""
+        # What did the viewer already hear? A change that made a noise is
+        # already delivered; the gap should go to something silent.
+        audio = analyse(a.media, anchor, g["start"])
+        note = describe_for_prompt(audio, spoken)
 
-        v = describe_film_change(before, after, budget, spoken, a.backend)
+        v = describe_film_change(before, after, budget, spoken, a.backend, note)
         mark = "say " if v["worth_saying"] else "skip"
         print(f"  [{mark}] gap {g['start']:>6}-{g['end']:<6} {budget:>2}w  "
               f"{v['changed'][:58]}", file=sys.stderr)
@@ -115,7 +120,7 @@ def main():
             print(f"          {meta['duration_s']}s > {avail:.2f}s, "
                   f"rewriting to {want}w", file=sys.stderr)
             text = describe_film_change(before, after, want, spoken,
-                                        a.backend)["description"]
+                                        a.backend, note)["description"]
         if meta and meta["duration_s"] > avail:
             print(f"          dropped — will not fit {avail:.2f}s", file=sys.stderr)
             continue
@@ -124,6 +129,7 @@ def main():
             "t": g["start"], "gap": g, "word_budget": budget,
             "changed": v["changed"], "description": text,
             "speech_s": meta["duration_s"] if meta else None,
+            "audio": {"character": audio["character"], "onsets": audio["onsets"]},
         })
         anchor = g["start"]
 
