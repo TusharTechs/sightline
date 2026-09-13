@@ -68,6 +68,45 @@ export const App = () => {
   // Default to the whole frame; narrowed once the timeline says otherwise.
   const [picture, setPicture] = useState({x: 0, y: 0, w: 1, h: 1});
   const chipTimer = useRef<number | null>(null);
+  /**
+   * Duck the film while something is spoken, then bring it back.
+   *
+   * `USAGE_ACCESSIBILITY` is supposed to make the platform duck other audio for
+   * us, and Amazon has confirmed that is the intended behaviour — but whether
+   * the virtual device emulates audio focus at all is still an open question
+   * with them, and description was being drowned by the score at its peaks.
+   * Since this app owns the film player as well as the description stream,
+   * ducking it here is deterministic rather than hoping the platform does it.
+   *
+   * Ramped rather than stepped: an instant drop on a music cue is audible as a
+   * glitch, and sounds like a fault rather than a feature.
+   *
+   * Never ducks in co-viewing — the room is listening to the film and has no
+   * idea anyone's phone is talking.
+   */
+  const DUCK_TO = 0.22;
+  const duckWhile = useCallback(
+    async (fn: () => Promise<any>) => {
+      if (targetRef.current !== 'tv') {
+        return fn();
+      }
+      const ramp = async (from: number, to: number, ms: number) => {
+        const steps = 6;
+        for (let i = 1; i <= steps; i++) {
+          player.setVolume(from + ((to - from) * i) / steps);
+          await new Promise((r) => setTimeout(r, ms / steps));
+        }
+      };
+      try {
+        await ramp(1, DUCK_TO, 140);
+        return await fn();
+      } finally {
+        await ramp(DUCK_TO, 1, 260);
+      }
+    },
+    [player],
+  );
+
   const flashChip = useCallback((text: string) => {
     setChip(text);
     if (chipTimer.current) clearTimeout(chipTimer.current);
@@ -121,10 +160,13 @@ export const App = () => {
           speak: async (cue) => {
             const buf = pcm.get(cue.rank);
             setCaption(cue.text);
-            const ok = buf ? await channel.speak(buf) : false;
-            return ok;
+            return duckWhile(async () =>
+              buf ? await channel.speak(buf) : false,
+            );
           },
           tone: async () => {
+            // The tone is short and deliberately cuts through; ducking for it
+            // would take longer to ramp than the tone lasts.
             if (tone.current) await channel.speak(tone.current);
           },
           pausePlayback: () => player.pause(),
@@ -200,7 +242,7 @@ export const App = () => {
       setStatus(`FAILED: ${e?.message ?? e}`);
       voice.say('error');
     }
-  }, [channel, pcm, player, voice]);
+  }, [channel, duckWhile, pcm, player, voice]);
 
   const startGeneration = useCallback(async () => {
     setPhase('generating');

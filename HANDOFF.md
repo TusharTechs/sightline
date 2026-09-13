@@ -262,6 +262,25 @@ the window being described, passed to the model as evidence. It detects *that*
 something was audible, not *what* it was, which is weaker than a semantic
 soundtrack model but enough to apply the rule.
 
+**Duck the film ourselves; do not rely on the platform.** `USAGE_ACCESSIBILITY`
+is documented to make the platform duck other audio, and Amazon has confirmed
+that is intended — but whether the virtual device emulates audio focus at all is
+still open with them, and in practice description was being drowned by the score
+at its peaks. Since the app owns the film player as well as the description
+stream, it ducks the film to 22% around every spoken line, ramped over 140ms
+down and 260ms back.
+
+Two rules fall out of it:
+
+- **Ramp, never step.** An instant drop on a music cue is audible as a glitch
+  and reads as a fault rather than a feature.
+- **Never duck in co-viewing.** The room is listening to the film and has no
+  idea anyone's phone is talking; ducking for a description they cannot hear
+  would be inexplicable.
+
+Note that `AudioPlaybackStream.duckVolumeAsync()` does not help here — it ducks
+*our* stream when something higher priority arrives, not the film.
+
 **Evaluate by task, not by taste.** Also from the same source, and it is the
 test protocol *and* the demo structure: *"Don't ask us whether the description is
 good. Ask us to do the task. Play the walkthrough and ask what we'd click next.

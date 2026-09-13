@@ -113,6 +113,17 @@ export class MsePlayer {
     return Number((this.player as any)?.duration ?? 0);
   }
 
+  get volume(): number {
+    const v = (this.player as any)?.volume;
+    return typeof v === 'number' ? v : 1;
+  }
+
+  setVolume(v: number): void {
+    try {
+      (this.player as any).volume = Math.max(0, Math.min(1, v));
+    } catch {}
+  }
+
   /** Playback rate. Description budgets are computed against this host-side. */
   setRate(rate: number): void {
     try {
