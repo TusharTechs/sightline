@@ -10,8 +10,9 @@
  * timeline prepared host-side. This file is wiring and remote handling.
  */
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {View, Text, StyleSheet, TVEventHandler, HWEvent} from 'react-native';
+import {View, Text, StyleSheet} from 'react-native';
 import {KeplerVideoSurfaceView} from '@amazon-devices/react-native-w3cmedia';
+import {useTVEventHandler} from '@amazon-devices/react-native-kepler';
 import {MsePlayer} from './media/MsePlayer';
 import {DescriptionChannel} from './media/DescriptionChannel';
 import {Scheduler} from './media/Scheduler';
@@ -239,18 +240,29 @@ export const App = () => {
     [boot, player],
   );
 
-  // Remote: Play/Pause toggles, Right cycles speed, Up toggles mode.
-  useEffect(() => {
-    const handler = (evt: HWEvent) => {
-      switch (evt?.eventType) {
-        case 'playPause':
+  // Remote input.
+  //
+  // This is `useTVEventHandler` from react-native-kepler, NOT `TVEventHandler`
+  // from react-native — the latter does not exist on this platform, and an
+  // earlier version of this file imported it and silently registered nothing,
+  // so no button did anything at all.
+  //
+  // `eventAction` is 0 for pressed and 1 for released; without filtering,
+  // every press fires twice and each toggle immediately undoes itself.
+  const onRemote = useCallback(
+    (evt: any) => {
+      if (!evt || evt.eventAction === 1) {
+        return;
+      }
+      switch (evt.eventType) {
+        case 'playpause':
         case 'select': {
           if (phase === 'undescribed') {
             startGeneration();
             break;
           }
           if (phase === 'generating') {
-            break;   // nothing useful to do; don't let a press look like a hang
+            break; // nothing useful to do; don't let a press look like a hang
           }
           const wasPaused = player.paused;
           wasPaused ? player.play() : player.pause();
@@ -258,6 +270,9 @@ export const App = () => {
           break;
         }
         case 'right': {
+          if (phase !== 'playing') {
+            break;
+          }
           const next = RATES[(RATES.indexOf(rate) + 1) % RATES.length];
           setRate(next);
           player.setRate(next);
@@ -265,6 +280,9 @@ export const App = () => {
           break;
         }
         case 'up': {
+          if (phase !== 'playing') {
+            break;
+          }
           const next: Mode = mode === 'fit' ? 'pause' : 'fit';
           setMode(next);
           scheduler.current?.setMode(next);
@@ -272,13 +290,17 @@ export const App = () => {
           break;
         }
         case 'down': {
+          if (phase !== 'playing') {
+            break;
+          }
           const next: AudioTarget = target === 'tv' ? 'phone' : 'tv';
           targetRef.current = next;
           setTarget(next);
-          // Cut any line already in progress — switching to the phone must
-          // silence this device immediately, not at the end of a sentence.
-          // Announce on the television even when moving to the phone — this is
-          // the last thing this device says, and silence would be ambiguous.
+          if (next === 'phone') {
+            channel.cancel();
+          }
+          // Announce even when moving to the phone — this is the last thing
+          // this device says, and silence would be ambiguous.
           voice.say(next === 'tv' ? 'target_tv' : 'target_phone');
           break;
         }
@@ -286,10 +308,11 @@ export const App = () => {
           voice.say('help');
           break;
       }
-    };
-    const sub = TVEventHandler.addListener?.(handler);
-    return () => sub?.remove?.();
-  }, [channel, mode, phase, player, rate, startGeneration, target, voice]);
+    },
+    [channel, mode, phase, player, rate, startGeneration, target, voice],
+  );
+
+  useTVEventHandler(onRemote);
 
   useEffect(
     () => () => {
