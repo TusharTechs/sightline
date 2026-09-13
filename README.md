@@ -17,6 +17,7 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 [**Try it yourself**](#try-it-without-a-fire-tv) &nbsp;·&nbsp;
 [**Architecture**](#architecture) &nbsp;·&nbsp;
 [**Evidence**](#evidence) &nbsp;·&nbsp;
+[**AWS**](#aws-integration) &nbsp;·&nbsp;
 [**Why it works this way**](#how-we-knew-what-to-build) &nbsp;·&nbsp;
 [**Limitations**](#limitations)
 
@@ -285,6 +286,69 @@ Down moves description to the phone · Menu speaks the controls.
 </details>
 
 ---
+
+---
+
+## AWS integration
+
+Three AWS services do real work in the pipeline — not decoration, and each
+earned its place by solving a specific problem.
+
+### Amazon Transcribe — finding where description can go
+
+`pipeline/src/detect_speech.py`
+
+The first version of this looked for **silence**. On a real trailer that finds
+2.5 usable seconds in 52, because the score never stops, and it would make film
+description essentially impossible. But describers talk over music constantly —
+what they avoid is dialogue.
+
+Transcribe's word-level timestamps give the speech intervals directly;
+everything else is available. **2.5 seconds became 42.9.** A 17x difference, and
+the single most consequential correction in the project.
+
+It also returns the dialogue text, which is fed to the model so a description
+never repeats a line the viewer just heard.
+
+```python
+tr.start_transcription_job(TranscriptionJobName=job,
+                           Media={"MediaFileUri": f"s3://{bucket}/{key}"},
+                           MediaFormat="mp3", LanguageCode="en-US")
+```
+
+### Amazon Polly — the description voice
+
+`pipeline/src/speech.py`
+
+Generative engine, falling back to neural where a voice or region lacks it.
+Chosen over the platform's own speech for three reasons: it is portable (the
+alternative was macOS-only, and this project has to build elsewhere), the
+generative voices are markedly better, and it returns **PCM natively** — which
+is exactly what `AudioPlaybackStream.writeAsync()` takes on Vega.
+
+Two things we learned the hard way and corrected in code:
+
+- **Polly pads both ends with silence**, and in fit-the-gaps mode that padding is
+  charged against the gap budget. It is trimmed before measurement.
+- **The speaking rate has to be measured, not assumed.** We guessed 170 wpm;
+  once the padding is trimmed the voice delivers **203**. Every line overflowed
+  its gap until we measured. `python3 src/speech.py calibrate` re-derives it.
+
+### Amazon S3 — media staging
+
+Transcribe reads its input from S3, so audio is uploaded, transcribed and the
+object deleted in the same call. The bucket is private with public access
+blocked.
+
+### What is deliberately not AWS
+
+Bedrock. It is refused at the account level on this account —
+`Error 002: Access to Bedrock models is not allowed for this account`, in every
+region, for every model, while S3, Polly and Transcribe all work on the same
+credentials. The Bedrock client is written and shipped
+(`pipeline/src/salience.py`, `--backend bedrock`, using `AnthropicBedrockMantle`)
+and the first-party API is used instead. The diagnosis is in
+[`STATUS.md`](STATUS.md).
 
 ## What is in here
 
