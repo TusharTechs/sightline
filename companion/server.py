@@ -35,6 +35,10 @@ LOCK = threading.Lock()
 GEN = {"running": False, "stage": "idle", "message": "", "done": 0, "total": 0,
        "ready": False, "error": None}
 GEN_LOCK = threading.Lock()
+
+# Debug channel for remote-input bring-up. The access log is suppressed, so
+# beacons from the app had nowhere to land.
+KEYLOG = []
 PIPELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pipeline")
 PY_BIN = os.path.join(PIPELINE, ".venv", "bin", "python")
 
@@ -283,6 +287,16 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/phone", "/phone.html"):
             with open(os.path.join(HERE, "phone.html"), "rb") as f:
                 return self._send(200, f.read(), "text/html; charset=utf-8")
+
+        if path.startswith("/KEY/"):
+            import urllib.parse
+            KEYLOG.append({"at": round(time.time(), 2),
+                           "raw": urllib.parse.unquote(path[5:])})
+            del KEYLOG[:-60]
+            return self._send(200, b'{"ok":true}')
+
+        if path == "/keys":
+            return self._send(200, json.dumps(KEYLOG[-30:], indent=2))
 
         if path == "/generate/status":
             with GEN_LOCK:

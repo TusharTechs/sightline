@@ -251,10 +251,18 @@ export const App = () => {
   // every press fires twice and each toggle immediately undoes itself.
   const onRemote = useCallback(
     (evt: any) => {
-      if (!evt || evt.eventAction === 1) {
+      // The released half of every press. The runtime field is
+      // `eventKeyAction` even though the SDK's own TVTypes.d.ts documents it as
+      // `eventAction`; filtering on the documented name matches nothing, so
+      // every press fires twice and each toggle instantly undoes itself.
+      // Both are checked so this keeps working if the docs ever become true.
+      if (!evt || evt.eventKeyAction === 1 || evt.eventAction === 1) {
         return;
       }
       switch (evt.eventType) {
+        // An injected or physical Enter arrives as 'enter', not 'select'.
+        // Both are in the documented event union and both mean the same button.
+        case 'enter':
         case 'playpause':
         case 'select': {
           if (phase === 'undescribed') {
