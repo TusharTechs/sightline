@@ -13,6 +13,7 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 
 <br>
 
+[**▶ Live demo**](https://d1ie12b84zbad7.cloudfront.net) &nbsp;·&nbsp;
 [**Watch it work**](#watch-it-work) &nbsp;·&nbsp;
 [**Try it yourself**](#try-it-without-a-fire-tv) &nbsp;·&nbsp;
 [**Architecture**](#architecture) &nbsp;·&nbsp;
@@ -33,16 +34,15 @@ The quickest way to check this is real rather than described:
 
 | to see | open |
 |---|---|
-| **that it works** | the loop below, then [`docs/clips/`](docs/clips/) — play a clip and listen |
+| **that it works** | [the live demo](https://d1ie12b84zbad7.cloudfront.net) — press play and listen |
 | **that it runs on the device** | [`app/`](app/) — a real Vega OS app; [`probes/`](probes/) shows what the platform would and would not do |
 | **that the numbers are real** | [Evidence](#evidence) — two of them reproduce with the commands given |
 | **that the design is not guesswork** | [Why it works this way](#how-we-knew-what-to-build) — the rules came from a blind accessibility professional, quoted directly |
 | **what we learned about Vega** | [`FRICTION-LOG.md`](FRICTION-LOG.md) (15 entries) and [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) |
 | **what is not finished** | [`STATUS.md`](STATUS.md) — kept honest, including what no blind user has tested yet |
 
-**Not yet available:** a hosted demo link and the submission video. Until then,
-[Try it yourself](#try-it-without-a-fire-tv) runs the whole thing locally with
-one command.
+**Fastest check of all:** [d1ie12b84zbad7.cloudfront.net](https://d1ie12b84zbad7.cloudfront.net) — press play and listen. Nothing to
+install. The submission video is not made yet.
 
 ## In thirty seconds
 
@@ -87,11 +87,21 @@ pixels across, and it is the shot.*
 
 ## Try it without a Fire TV
 
-Most people evaluating this have no Fire TV, and a blind tester certainly will
-not install an SDK — so the same timeline, the same description audio and the
-same question endpoint drive a plain web page. **No device, no SDK, no build.**
+### ▶ [d1ie12b84zbad7.cloudfront.net](https://d1ie12b84zbad7.cloudfront.net)
 
-You do need to run the service, which is one command after cloning:
+Open it on anything and press **Play with description**. No device, no SDK, no
+install — the same timeline and the same generated audio that the Fire TV app
+uses, driving a plain web page. About 6 MB, so it starts quickly on mobile data.
+
+Built for a screen reader: large targets, one primary action, semantic
+landmarks, and an `aria-live` region that announces state.
+
+*Asking questions is not available on the hosted version — answers are generated
+live and need a server. Run it locally for that.*
+
+### Running the whole thing locally
+
+One command after cloning, and this adds the question answering:
 
 ```bash
 SIGHTLINE_BUNDLE=/path/to/bundle pipeline/.venv/bin/python companion/server.py
