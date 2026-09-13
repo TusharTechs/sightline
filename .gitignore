@@ -7,3 +7,14 @@ bug-artifacts/
 pipeline/fixtures/**/frames/
 pipeline/out/*.pcm
 pipeline/.venv/
+
+# Build output and generated artefacts. Deliverable clips live in docs/clips.
+pipeline/out/
+pipeline/fixtures/**/narration.wav
+pipeline/fixtures/**/*.mp4
+**/__pycache__/
+*.pyc
+app/buildinfo.json
+
+# Local reference only, not part of the published project
+DEMO-PLAN.md

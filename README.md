@@ -75,9 +75,9 @@ Pre-rendered clips, if you would rather just play a file:
 
 | clip | what to listen for |
 |---|---|
-| [`sintel-described-1.0x.mp4`](pipeline/out/) | eight generated descriptions placed between the lines of a real trailer |
-| [`sintel-described-2.0x.mp4`](pipeline/out/) | same story, fewer words — *"Now checked"* rather than *"The checkbox is now ticked"* |
-| [`walkthrough-described.mp4`](pipeline/out/) | pause-and-explain mode on a software walkthrough |
+| [`sintel-described-1.0x.mp4`](docs/clips/sintel-described-1.0x.mp4) | eight generated descriptions placed between the lines of a real trailer |
+| [`sintel-described-2.0x.mp4`](docs/clips/sintel-described-2.0x.mp4) | same story, fewer words — *"Now checked"* rather than *"The checkbox is now ticked"* |
+| [`walkthrough-described.mp4`](docs/clips/walkthrough-described.mp4) | pause-and-explain mode on a software walkthrough |
 
 ---
 
