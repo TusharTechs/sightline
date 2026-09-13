@@ -18,9 +18,24 @@ from speech import synthesize, budget_words
 
 
 def fragment(src, dst):
-    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-c", "copy",
+    """Rewrite as fragmented mp4, which is what MSE needs to append.
+
+    Handles src and dst being the same file. That happens whenever a bundle is
+    regenerated in place — the app asks to describe `content.mp4` and the bundle
+    it produces is also `content.mp4` — and ffmpeg refuses to write over its own
+    input, which surfaced only as a non-zero exit deep in a background thread.
+    """
+    same = os.path.exists(dst) and os.path.samefile(src, dst)
+    # The temp name must still end in .mp4 — ffmpeg picks the muxer from the
+    # extension, and a ".tmp" suffix fails as an argument error rather than a
+    # media one, which reads like a corrupt file and is not.
+    target = dst.replace(".mp4", ".frag.mp4") if same else dst
+    subprocess.run(["ffmpeg", "-y", "-nostdin", "-loglevel", "error",
+                    "-i", src, "-c", "copy",
                     "-movflags", "+frag_keyframe+empty_moov+default_base_moof",
-                    dst], check=True)
+                    target], check=True)
+    if same:
+        os.replace(target, dst)
 
 
 def codec_string(path):
