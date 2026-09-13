@@ -4,6 +4,11 @@
 #
 # Chrome's --screenshot does not reliably exit on this build, so each frame is
 # launched detached and reaped once the PNG has been written.
+#
+# NOTE: this launches one Chrome per frame, which is slow (~3.5s each) and makes
+# a dock icon flicker for the whole run. Driving a single instance over the
+# DevTools protocol would be faster and quieter; not worth it while fixtures are
+# rendered once and then left alone.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
