@@ -1,9 +1,10 @@
 schema-version = 1
 
 [package]
-title = "Basic UI React Native Application for project sightline"
+title = "Sightline"
 version = "0.1.0"
 id = "com.sightline.tv"
+icon = "@image/sightline.png"
 
 [os.version]
 min = "1.2"

@@ -41,10 +41,11 @@ Two details that matter more than they look:
 
 **Still untested:** whether VoiceView works with it on physical hardware.
 
-### 2. No LICENSE and no README.
+### 2. ~~No LICENSE and no README.~~ Done.
 
-The Open Source mini-challenge is unwinnable without them, and this is an hour
-of work. Nothing else has a better ratio.
+MIT licence, a README arranged so a judge can verify claims without running
+anything, a mermaid architecture diagram, and the app finally has a name and an
+icon rather than "Basic UI React Native Application for project sightline".
 
 ### 3. "Real time" needs to be either true or reworded.
 
