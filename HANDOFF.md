@@ -336,6 +336,42 @@ choice to speed up — which is exactly the situation the tone was designed for:
 *"At 2x I already know I'm trading detail for speed. I'm not owed everything.
 I'm owed knowing what I traded."*
 
+**A sound that explains itself, skip it — not a sound that is present.** The
+audibility rule, sharpened by the ADP list reviewer after a first implementation
+got it backwards:
+
+> *"A door, footsteps, somebody crying. Those sounds explain themselves. A bang
+> with nothing attached to it isn't information, it's a question, and I'll sit on
+> that question for the next minute of the film instead of following the story.
+> So it isn't sound present, skip it. It's sound that explains itself, skip it.
+> Sound that doesn't explain itself goes near the top."*
+
+So the ranking is three-tier, not two:
+
+| rank | case | why |
+|---|---|---|
+| highest | a sound with **no visible cause** | the viewer heard something and cannot resolve it; only description can |
+| middle | a **silent** change | invisible to them, but nothing is nagging |
+| lowest | a sound **with** a visible cause | they worked it out already |
+
+**How it is decided.** We already had the frames. For the sharpest onsets in each
+stretch, the frames either side are examined and the model is asked whether
+anything visible accounts for the sound. Verified on Sintel: the winged
+creature's swoop is correctly explained; another onset is correctly not.
+
+**The hard constraint on writing.** Never name what made an unseen sound:
+
+> *"Get that wrong once and I stop trusting the whole track. 'Something crashes
+> off screen' tells me what I need without naming what fell."*
+
+**Known weakness, and it is real.** Onset detection cannot tell a music hit from
+a diegetic event. A swelling score over a title card produced onsets with no
+visible cause and was briefly ranked as highly as a crash off screen. Onsets over
+near-black frames are now ignored — "nothing visible accounts for it" is
+trivially true there and meaningless — which cut false positives from five to
+three on the trailer. It does not solve the general case: loud music over a
+visible scene can still read as an unexplained sound.
+
 **Evaluate by task, not by taste.** Also from the same source, and it is the
 test protocol *and* the demo structure: *"Don't ask us whether the description is
 good. Ask us to do the task. Play the walkthrough and ask what we'd click next.
