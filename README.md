@@ -29,16 +29,45 @@ batch job months earlier, you can interrupt it and ask a question.
 
 ## Watch it work
 
+![Sightline describing a film on Fire TV](docs/screens/sightline.gif)
+
+Running on the Fire TV app: the film plays, and description lands between the
+lines. Nothing on screen but the mark, until there is something to say.
+
+| | |
+|---|---|
+| ![](docs/screens/describing.png) | ![](docs/screens/playing.png) |
+| A generated description, spoken and captioned | Quiet during playback — the screen belongs to the film |
+
+---
+
+## Try it without a Fire TV
+
+**You do not need the SDK, a device, or a build.** Most people evaluating this
+have no Fire TV, and a blind tester certainly will not install one — so the same
+timeline, the same description audio and the same question endpoint drive a
+plain web page.
+
+```bash
+SIGHTLINE_BUNDLE=/path/to/bundle pipeline/.venv/bin/python companion/server.py
+```
+
+Open `http://<your-ip>:8099/` on anything with a browser and press
+**Play with description**. You get the film with generated description ducked
+over it, and the **Ask about this moment** buttons work — the answer comes from
+the frame you are actually on.
+
+It is the product minus the television. The page is built for a screen reader:
+large targets, one primary action, semantic landmarks, and an `aria-live` region
+that announces state.
+
+Pre-rendered clips, if you would rather just play a file:
+
 | clip | what to listen for |
 |---|---|
 | [`sintel-described-1.0x.mp4`](pipeline/out/) | eight generated descriptions placed between the lines of a real trailer |
 | [`sintel-described-2.0x.mp4`](pipeline/out/) | same story, fewer words — *"Now checked"* rather than *"The checkbox is now ticked"* |
 | [`walkthrough-described.mp4`](pipeline/out/) | pause-and-explain mode on a software walkthrough |
-
-**On device:** `app/` is a real Vega OS app. It plays video over MSE, speaks
-description on a concurrent `USAGE_ACCESSIBILITY` stream that ducks the film
-automatically, and voices its own interface so a blind user can operate it
-without the platform screen reader.
 
 ---
 

@@ -173,7 +173,10 @@ export const App = () => {
           resumePlayback: () => player.play(),
           onCue: (cue, n) => {
             setDropped(n);
-            if (!cue) setTimeout(() => setCaption(''), 1200);
+            // speak() now resolves when the line has actually finished, so
+            // clearing here no longer cuts the caption off mid-sentence. A
+            // short tail keeps it readable without drifting into the next shot.
+            if (!cue) setTimeout(() => setCaption(''), 400);
           },
         },
         timeline.mode,
@@ -525,29 +528,31 @@ const styles = StyleSheet.create({
     left: SAFE,
     right: SAFE,
     alignItems: 'center',
-    marginBottom: 34,
+    marginBottom: 22,
   },
   captionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    maxWidth: 1400,
-    backgroundColor: 'rgba(6,9,13,0.88)',
-    borderRadius: 16,
-    paddingVertical: 22,
-    paddingHorizontal: 30,
+    // Narrower and shorter than a full-width bar. Cinemascope content leaves
+    // a short picture, and a caption sized for 16:9 covers the subject's face.
+    maxWidth: 1080,
+    backgroundColor: 'rgba(6,9,13,0.86)',
+    borderRadius: 14,
+    paddingVertical: 15,
+    paddingHorizontal: 24,
   },
   captionAccent: {
-    width: 4,
+    width: 3,
     alignSelf: 'stretch',
     borderRadius: 2,
     backgroundColor: ACCENT,
-    marginRight: 22,
+    marginRight: 18,
   },
   caption: {
     flexShrink: 1,
     color: '#f4f7fa',
-    fontSize: 34,
-    lineHeight: 46,
+    fontSize: 27,
+    lineHeight: 36,
     fontWeight: '500',
     letterSpacing: 0.2,
   },
