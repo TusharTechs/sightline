@@ -1,10 +1,47 @@
-<img src="brand/sightline-logo.svg" alt="Sightline" width="300">
+<div align="center">
 
-**Audio description for content that has none — generated, spoken on your Fire TV, and answerable mid-scene.**
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="brand/sightline-mark-dark.svg">
+  <img src="brand/sightline-mark-light.svg" width="78" alt="">
+</picture>
 
-Built for the Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track.
+# Sightline
+
+**Audio description for content that has none —<br>generated, spoken on your Fire TV, and answerable mid-scene.**
+
+Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
+
+<br>
+
+[**Watch it work**](#watch-it-work) &nbsp;·&nbsp;
+[**Try it yourself**](#try-it-without-a-fire-tv) &nbsp;·&nbsp;
+[**Architecture**](#architecture) &nbsp;·&nbsp;
+[**Evidence**](#evidence) &nbsp;·&nbsp;
+[**Why it works this way**](#how-we-knew-what-to-build) &nbsp;·&nbsp;
+[**Limitations**](#limitations)
+
+<br>
+
+</div>
 
 ---
+
+## For reviewers, in five minutes
+
+The quickest way to check this is real rather than described:
+
+| to see | open |
+|---|---|
+| **that it works** | the loop below, then [`docs/clips/`](docs/clips/) — play a clip and listen |
+| **that it runs on the device** | [`app/`](app/) — a real Vega OS app; [`probes/`](probes/) shows what the platform would and would not do |
+| **that the numbers are real** | [Evidence](#evidence) — two of them reproduce with the commands given |
+| **that the design is not guesswork** | [Why it works this way](#how-we-knew-what-to-build) — the rules came from a blind accessibility professional, quoted directly |
+| **what we learned about Vega** | [`FRICTION-LOG.md`](FRICTION-LOG.md) (15 entries) and [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) |
+| **what is not finished** | [`STATUS.md`](STATUS.md) — kept honest, including what no blind user has tested yet |
+
+**Not yet available:** a hosted demo link and the submission video. Until then,
+[Try it yourself](#try-it-without-a-fire-tv) runs the whole thing locally with
+one command.
 
 ## In thirty seconds
 
@@ -291,10 +328,16 @@ Kept current in [`STATUS.md`](STATUS.md). The ones worth knowing before you judg
 
 ---
 
-## Licence and attribution
+## Licence
 
 MIT — see [LICENSE](LICENSE).
 
-Sintel © Blender Foundation, licensed CC-BY 3.0. Speech timings by Amazon
-Transcribe; description voice by Amazon Polly; description and answers by
-Claude Opus 5.
+**Required attribution.** Demo footage is *Sintel*, © Blender Foundation,
+[durian.blender.org](https://durian.blender.org), licensed **CC-BY 3.0**. Any
+video using this footage must carry that credit. Full details in
+[attribution/CREDITS.md](attribution/CREDITS.md).
+
+**Built with** — not an attribution requirement, listed because it is the first
+thing anyone evaluating this asks: Amazon Transcribe for speech timings, Amazon
+Polly for the description voice, and Claude Opus 5 for the descriptions and the
+answers.
