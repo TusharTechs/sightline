@@ -55,6 +55,48 @@ assesses friction-log entries and passes a recommended bonus to the judging
 panel. See `FRICTION-LOG.md` — 11 entries already, all from real work. This is
 first-class deliverable, not an afterthought.
 
+
+## 2.a Rules compliance — checked against the official rules, 13 September 2026
+
+**Naming the tools is required, not risky.** The rules oblige every entrant to
+submit *"Product Feedback for each tool, API, or SDK used in your project"*.
+Disclosure of what was used is a submission requirement. Naming Claude Opus 5,
+Amazon Transcribe and Amazon Polly in the README and the architecture diagram is
+consistent with that, and hiding them would be the odd choice.
+
+**The trademark restriction applies to the demo video, not the repository.** The
+exact wording is that demo videos *"must not include third party trademarks, or
+copyrighted music or other material unless the Entrant has permission"*. Nothing
+restricts naming tools in a README.
+
+Practical consequence for the video: **avoid third-party logos on screen.**
+Naming a service in narration or plain text is ordinary nominative use; showing
+its logo is the avoidable risk. If the architecture diagram appears in the video,
+use the wordless version.
+
+### Checklist
+
+| requirement | status |
+|---|---|
+| Public repository with an open-source licence file | MIT, detected by GitHub |
+| Licence visible at the top of the repository page | yes — the License tab resolves |
+| Clear setup and run instructions in the repository | README, two paths (pipeline only, and on-device) |
+| Working project built with the track's required tools | Vega OS app, real device APIs |
+| Demo video **under 3 minutes** | not made yet |
+| Video **must show the project functioning on the device it was built for** | plan accounts for it — the web page alone would not satisfy this |
+| Video free of third-party trademarks and copyrighted material | Sintel is CC-BY with attribution; no logos on screen |
+| Text description of features and functionality | Devpost field, not written yet |
+| Product feedback for each tool, API and SDK used | FRICTION-LOG.md is the raw material; needs shaping per tool |
+| Newly created during the submission period | yes |
+| Authorised to use any third-party SDK, API or data | Anthropic API under its terms; AWS under the account's terms; Sintel under CC-BY |
+
+**Worth knowing:** the Sponsor and Devpost receive the right to promote the
+submission, including name, likeness, voice and image, for three years.
+
+**The device-footage requirement is the one with teeth.** A video that only shows
+the browser demo would not show the project *"functioning on the device for which
+it was built"*. The Fire TV app has to be on screen.
+
 ---
 
 ## 3. Product definition
