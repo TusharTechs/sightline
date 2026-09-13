@@ -36,13 +36,22 @@
   .said li { margin-bottom: 10px; padding-left: 0; list-style: none; }
   .said .t { color: #8797a8; font-size: 14px; }
   /* Visible only to screen readers — the live region does the real talking. */
+  video { width: 100%; border-radius: 12px; background: #000; margin-bottom: 14px; display: block; }
+  video[hidden] { display: none; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 
-<h1>Sightline companion</h1>
-<p class="sub">Description plays here. The room hears the film as normal.</p>
+<h1>Sightline</h1>
+<p class="sub" id="tagline">Audio description for content that has none.</p>
 
-<button id="start" class="primary">Start listening</button>
+<!-- Standalone mode. Almost nobody evaluating this has a Fire TV, and a blind
+     tester certainly will not install an SDK — so the same timeline, the same
+     description audio and the same question endpoint drive a plain video
+     element here. It is the product, minus the television. -->
+<video id="film" playsinline controls preload="metadata" aria-label="Film with generated audio description"></video>
+
+<button id="start" class="primary">Play with description</button>
+<button id="follow">Follow a Fire TV instead</button>
 
 <div class="status" role="status" aria-live="polite">
   <b id="statusLine">Not connected</b>
@@ -78,6 +87,9 @@
         answerMeta = el('answerMeta');
   let lastT = 0;
 
+  const film = el('film'), followBtn = el('follow');
+  // 'standalone' plays the film here; 'follow' tracks a Fire TV.
+  let mode = 'standalone';
   let ctx = null;            // unlocked by the Start gesture; mobile requires it
   let timeline = null;
   const buffers = new Map();  // rank -> AudioBuffer
@@ -96,6 +108,7 @@
   function play(cue) {
     const b = buffers.get(cue.rank);
     if (!b) return;
+    duckFilm(b.duration);
     const src = ctx.createBufferSource();
     src.buffer = b;
     src.connect(ctx.destination);
@@ -112,13 +125,41 @@
       timeline = s.timeline;
       await Promise.all(timeline.cues.map(fetchBuffer));
       askSection.hidden = false;
-      say(`Connected. ${timeline.cues.length} descriptions ready.`);
+      if (mode === 'standalone') film.src = timeline.media;
+      say(`Ready. ${timeline.cues.length} descriptions.`);
     }
     return s;
   }
 
+  function fireCues(t) {
+    if (!timeline) return;
+    for (const cue of timeline.cues) {
+      if (!played.has(cue.rank) && cue.t <= t && t - cue.t < 4) {
+        played.add(cue.rank);
+        play(cue);
+      }
+    }
+  }
+
+  // Standalone: the film is here, so duck it under each description exactly as
+  // the television does. Without this the score buries the voice at its peaks.
+  let duckTimer = null;
+  function duckFilm(seconds) {
+    if (mode !== 'standalone') return;
+    clearTimeout(duckTimer);
+    film.volume = 0.22;
+    duckTimer = setTimeout(() => { film.volume = 1; }, seconds * 1000 + 260);
+  }
+
   async function tick() {
     if (!running) return;
+    if (mode === 'standalone') {
+      lastT = film.currentTime || 0;
+      statusLine.textContent = film.paused ? 'Paused' : 'Playing';
+      detail.textContent = `${lastT.toFixed(0)} seconds in`;
+      fireCues(lastT);
+      return;
+    }
     let s;
     try { s = await connect(); }
     catch { statusLine.textContent = 'Lost the television'; detail.textContent = 'Trying again.'; return; }
@@ -149,17 +190,33 @@
     }
   }
 
-  startBtn.addEventListener('click', async () => {
+  async function begin(which) {
+    mode = which;
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') await ctx.resume();
     running = true;
-    startBtn.textContent = 'Listening';
     startBtn.setAttribute('aria-pressed', 'true');
     startBtn.classList.remove('primary');
-    say('Listening for the television.');
+    await connect();
+    if (mode === 'standalone') {
+      startBtn.textContent = 'Playing with description';
+      followBtn.hidden = true;
+      film.hidden = false;
+      say('Playing with description.');
+      try { await film.play(); } catch { say('Press play on the video.'); }
+    } else {
+      startBtn.hidden = true;
+      followBtn.textContent = 'Following the television';
+      film.hidden = true;
+      say('Listening for the television.');
+    }
     tick();
-    setInterval(tick, 300);
-  });
+    setInterval(tick, 250);
+  }
+
+  startBtn.addEventListener('click', () => begin('standalone'));
+  followBtn.addEventListener('click', () => begin('follow'));
+  film.hidden = true;
 
   // Interactive description. The Fire TV has no app-level speech recognition,
   // so a spoken question can only ever begin on this device — which is the

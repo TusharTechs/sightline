@@ -28,6 +28,7 @@ const FRAMES_PER_BUFFER = 1024;
 const BUFFER_COUNT = 4;
 /** Write in chunks so a long line can be interrupted between them. */
 const CHUNK_BYTES = FRAMES_PER_BUFFER * 4 * 8;
+const BYTES_PER_SECOND = 48000 * 2 * 2;   // 48kHz, stereo, 16-bit
 
 export class DescriptionChannel {
   private stream: AudioPlaybackStream | null = null;
@@ -62,7 +63,16 @@ export class DescriptionChannel {
   }
 
   /**
-   * Speak one line. Resolves when the last sample has been written.
+   * Speak one line. Resolves when the audio has actually FINISHED PLAYING.
+   *
+   * `writeAsync` returns once bytes are accepted into the buffer, not once they
+   * have been heard, so resolving on the last write reports the line as done
+   * while it is still being spoken. Callers use this to decide when to clear the
+   * caption and when to restore the film's volume, and both were happening
+   * mid-sentence.
+   *
+   * There is no "drained" callback, so the remaining time is derived from the
+   * byte count: PCM at a known rate is exactly as long as its length says.
    *
    * Overlapping speech is never correct here — two descriptions at once is
    * worse than one missed — so a call while already speaking is dropped rather
@@ -74,6 +84,8 @@ export class DescriptionChannel {
     }
     this.speaking = true;
     this.cancelled = false;
+    const started = Date.now();
+    const playMs = (pcm.byteLength / BYTES_PER_SECOND) * 1000;
     try {
       for (let off = 0; off < pcm.byteLength; off += CHUNK_BYTES) {
         if (this.cancelled) {
@@ -84,6 +96,11 @@ export class DescriptionChannel {
         if (typeof status === 'number' && status < 0) {
           return false;
         }
+      }
+      // Writing finished; playback has not. Wait out the remainder.
+      const left = playMs - (Date.now() - started);
+      if (left > 0) {
+        await new Promise((r) => setTimeout(r, left));
       }
       return true;
     } finally {
