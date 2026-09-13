@@ -49,19 +49,23 @@ pixels across, and it is the shot.*
 
 ## Try it without a Fire TV
 
-**You do not need the SDK, a device, or a build.** Most people evaluating this
-have no Fire TV, and a blind tester certainly will not install one — so the same
-timeline, the same description audio and the same question endpoint drive a
-plain web page.
+Most people evaluating this have no Fire TV, and a blind tester certainly will
+not install an SDK — so the same timeline, the same description audio and the
+same question endpoint drive a plain web page. **No device, no SDK, no build.**
+
+You do need to run the service, which is one command after cloning:
 
 ```bash
 SIGHTLINE_BUNDLE=/path/to/bundle pipeline/.venv/bin/python companion/server.py
 ```
 
-Open `http://<your-ip>:8099/` on anything with a browser and press
-**Play with description**. You get the film with generated description ducked
-over it, and the **Ask about this moment** buttons work — the answer comes from
-the frame you are actually on.
+Then open `http://localhost:8099/` and press **Play with description**. You get
+the film with generated description ducked over it, and the **Ask about this
+moment** buttons work — the answer comes from the frame you are actually on.
+
+On the same network, other devices can reach it at your machine's LAN address
+(`http://192.168.x.x:8099/`) — useful for testing on a phone, but it is a
+private address and will not work from anywhere else.
 
 It is the product minus the television. The page is built for a screen reader:
 large targets, one primary action, semantic landmarks, and an `aria-live` region
