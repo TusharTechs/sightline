@@ -68,6 +68,7 @@ export const App = () => {
   // Default to the whole frame; narrowed once the timeline says otherwise.
   const [picture, setPicture] = useState({x: 0, y: 0, w: 1, h: 1});
   const chipTimer = useRef<number | null>(null);
+  const captionTimer = useRef<number | null>(null);
   /**
    * Duck the film while something is spoken, then bring it back.
    *
@@ -159,6 +160,14 @@ export const App = () => {
         {
           speak: async (cue) => {
             const buf = pcm.get(cue.rank);
+            // Cancel the previous line's pending clear. Descriptions often
+            // follow each other within a few hundred milliseconds, and a stale
+            // timer would wipe THIS caption moments after it appeared — which
+            // looked like captions vanishing before their audio had finished.
+            if (captionTimer.current) {
+              clearTimeout(captionTimer.current);
+              captionTimer.current = null;
+            }
             setCaption(cue.text);
             return duckWhile(async () =>
               buf ? await channel.speak(buf) : false,
@@ -176,7 +185,13 @@ export const App = () => {
             // speak() now resolves when the line has actually finished, so
             // clearing here no longer cuts the caption off mid-sentence. A
             // short tail keeps it readable without drifting into the next shot.
-            if (!cue) setTimeout(() => setCaption(''), 400);
+            if (!cue) {
+              if (captionTimer.current) clearTimeout(captionTimer.current);
+              captionTimer.current = setTimeout(
+                () => setCaption(''),
+                400,
+              ) as unknown as number;
+            }
           },
         },
         timeline.mode,
@@ -393,6 +408,8 @@ export const App = () => {
       if (poll.current) clearInterval(poll.current);
       if (report.current) clearInterval(report.current);
       if (genPoll.current) clearInterval(genPoll.current);
+      if (captionTimer.current) clearTimeout(captionTimer.current);
+      if (chipTimer.current) clearTimeout(chipTimer.current);
       channel.destroy();
       player.destroy();
     },
