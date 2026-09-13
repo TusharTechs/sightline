@@ -22,6 +22,18 @@ const HOST = 'http://10.0.2.2:8099';
 const TIMELINE_URL = `${HOST}/timeline.json`;
 const RATES = [1.0, 1.5, 2.0];
 
+/**
+ * Where description is heard.
+ *
+ *  tv     — solo viewing. Description plays on this device's accessibility
+ *           stream and the platform ducks the film under it.
+ *  phone  — co-viewing. The room hears the film untouched; description goes
+ *           only to the companion device. This is not a volume setting, it is
+ *           the opposite audio design, and it is the case a blind viewer
+ *           watching with sighted company actually has.
+ */
+type AudioTarget = 'tv' | 'phone';
+
 export const App = () => {
   const player = useRef(new MsePlayer()).current;
   const channel = useRef(new DescriptionChannel()).current;
@@ -31,12 +43,15 @@ export const App = () => {
   const surfaceReady = useRef(false);
   const booted = useRef(false);
   const poll = useRef<number | null>(null);
+  const report = useRef<number | null>(null);
 
   const [status, setStatus] = useState('starting');
   const [caption, setCaption] = useState('');
   const [dropped, setDropped] = useState(0);
   const [mode, setMode] = useState<Mode>('fit');
   const [rate, setRate] = useState(1.0);
+  const [target, setTarget] = useState<AudioTarget>('tv');
+  const targetRef = useRef<AudioTarget>('tv');
   const [elapsed, setElapsed] = useState(0);
 
   const boot = useCallback(async () => {
@@ -100,8 +115,29 @@ export const App = () => {
       poll.current = setInterval(() => {
         const t = player.currentTime;
         setElapsed(t);
-        scheduler.current?.tick(t, player.rate);
+        // In co-viewing the phone schedules for itself from the same timeline;
+        // this device must stay silent, or the room hears it twice.
+        if (targetRef.current === 'tv') {
+          scheduler.current?.tick(t, player.rate);
+        }
       }, 120) as unknown as number;
+
+      // Report the playhead so a companion device can follow it. Fire and
+      // forget: the phone tolerates a missed update, and blocking playback on
+      // a network round trip would be far worse than a stale reading.
+      if (report.current) clearInterval(report.current);
+      report.current = setInterval(() => {
+        fetch(`${HOST}/position`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            t: player.currentTime,
+            rate: player.rate,
+            mode: targetRef.current,
+            playing: !player.paused,
+          }),
+        }).catch(() => {});
+      }, 300) as unknown as number;
       player.on('playing', () => setStatus('playing'));
       player.on('ended', () => setStatus('ended'));
 
@@ -143,15 +179,27 @@ export const App = () => {
           scheduler.current?.setMode(next);
           break;
         }
+        case 'down': {
+          const next: AudioTarget = target === 'tv' ? 'phone' : 'tv';
+          targetRef.current = next;
+          setTarget(next);
+          // Cut any line already in progress — switching to the phone must
+          // silence this device immediately, not at the end of a sentence.
+          if (next === 'phone') {
+            channel.cancel();
+          }
+          break;
+        }
       }
     };
     const sub = TVEventHandler.addListener?.(handler);
     return () => sub?.remove?.();
-  }, [mode, player, rate]);
+  }, [channel, mode, player, rate, target]);
 
   useEffect(
     () => () => {
       if (poll.current) clearInterval(poll.current);
+      if (report.current) clearInterval(report.current);
       channel.destroy();
       player.destroy();
     },
@@ -169,6 +217,9 @@ export const App = () => {
         <Text style={styles.badge}>
           {mode === 'fit' ? 'Fit the gaps' : 'Pause and explain'} · {rate}x
           {dropped > 0 ? ` · ${dropped} not said` : ''}
+        </Text>
+        <Text style={styles.target}>
+          {target === 'tv' ? '🔊 Description on this TV' : '📱 Description on phone only'}
         </Text>
         <Text style={styles.status}>
           {status} · {elapsed.toFixed(1)}s
@@ -198,6 +249,7 @@ const styles = StyleSheet.create({
   },
   badge: {color: '#fff', fontSize: 20, fontWeight: '600'},
   status: {color: '#b6c2d2', fontSize: 15, marginTop: 2},
+  target: {color: '#3ddc97', fontSize: 17, marginTop: 6, fontWeight: '600'},
   captionBar: {
     position: 'absolute',
     left: 60,
