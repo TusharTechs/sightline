@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sightline companion</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    background: #0b0f14; color: #f2f5f8;
+    font: 17px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 21px; margin: 0 0 2px; }
+  .sub { color: #8797a8; font-size: 15px; margin-bottom: 20px; }
+
+  /* Touch targets are deliberately large. This is operated without looking. */
+  button {
+    display: block; width: 100%; min-height: 68px; margin-bottom: 12px;
+    font: 600 19px/1.3 inherit; color: #f2f5f8;
+    background: #1b2530; border: 2px solid #2f3f50; border-radius: 14px;
+    padding: 16px; text-align: left;
+  }
+  button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.quick { min-height: 58px; font-size: 17px; font-weight: 500; }
+  button:disabled { opacity: 0.55; }
+  button:active { transform: scale(0.99); }
+  button[aria-pressed="true"] { border-color: #3ddc97; }
+  button:focus-visible { outline: 3px solid #3ddc97; outline-offset: 2px; }
+
+  .status { border: 2px solid #2f3f50; border-radius: 14px; padding: 16px; margin-bottom: 18px; }
+  .status b { display: block; font-size: 19px; margin-bottom: 4px; }
+  .dim { color: #8797a8; font-size: 15px; }
+  .said { margin-top: 18px; }
+  .said h2 { font-size: 15px; color: #8797a8; margin: 0 0 8px; font-weight: 600; }
+  .said li { margin-bottom: 10px; padding-left: 0; list-style: none; }
+  .said .t { color: #8797a8; font-size: 14px; }
+  /* Visible only to screen readers — the live region does the real talking. */
+  video { width: 100%; border-radius: 12px; background: #000; margin-bottom: 14px; display: block; }
+  video[hidden] { display: none; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+
+<h1>Sightline</h1>
+<p class="sub" id="tagline">Audio description for content that has none.</p>
+
+<!-- Standalone mode. Almost nobody evaluating this has a Fire TV, and a blind
+     tester certainly will not install an SDK — so the same timeline, the same
+     description audio and the same question endpoint drive a plain video
+     element here. It is the product, minus the television. -->
+<video id="film" playsinline controls preload="metadata" aria-label="Film with generated audio description"></video>
+
+<button id="start" class="primary">Play with description</button>
+<button id="follow">Follow a Fire TV instead</button>
+
+<div class="status" role="status" aria-live="polite">
+  <b id="statusLine">Not connected</b>
+  <span class="dim" id="detail">Press Start listening to connect to the television.</span>
+</div>
+
+<section id="askSection" hidden aria-labelledby="askHead">
+  <h2 id="askHead" class="sub" style="margin:22px 0 10px">Ask about this moment</h2>
+  <button id="askVoice" class="primary">Hold to ask a question</button>
+  <button class="quick" data-q="What's happening right now?">What's happening right now?</button>
+  <button class="quick" data-q="Who else is in this scene?">Who else is in this scene?</button>
+  <button class="quick" data-q="What is she carrying?">What is she carrying?</button>
+  <div class="status" id="answerBox" role="status" aria-live="polite" hidden>
+    <b id="answerText"></b>
+    <span class="dim" id="answerMeta"></span>
+  </div>
+</section>
+
+<div class="said" aria-live="off">
+  <h2>Described so far</h2>
+  <ul id="log"></ul>
+</div>
+
+<div class="sr" aria-live="assertive" id="announce"></div>
+
+<script>
+(() => {
+  const el = (id) => document.getElementById(id);
+  const statusLine = el('statusLine'), detail = el('detail'), log = el('log');
+  const announce = el('announce'), startBtn = el('start');
+  const askSection = el('askSection'), askVoice = el('askVoice');
+  const answerBox = el('answerBox'), answerText = el('answerText'),
+        answerMeta = el('answerMeta');
+  let lastT = 0;
+
+  const film = el('film'), followBtn = el('follow');
+  // 'standalone' plays the film here; 'follow' tracks a Fire TV.
+  let mode = 'standalone';
+  let ctx = null;            // unlocked by the Start gesture; mobile requires it
+  let timeline = null;
+  const buffers = new Map();  // rank -> AudioBuffer
+  const played = new Set();
+  let running = false;
+  let lastAge = null;
+
+  const say = (msg) => { announce.textContent = ''; setTimeout(() => announce.textContent = msg, 40); };
+
+  async function fetchBuffer(cue) {
+    // Static hosting serves mp3 (a twenty-fifth of the bytes); the local
+    // service wraps the device's PCM as wav on the way out. Try the small one
+    // first so a tester on mobile data is not made to wait for either.
+    const base = cue.pcm.replace(/\.pcm$/, '');
+    for (const ext of ['.mp3', '.wav']) {
+      try {
+        const res = await fetch(base + ext);
+        if (!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        buffers.set(cue.rank, await ctx.decodeAudioData(buf));
+        return;
+      } catch {}
+    }
+  }
+
+  function play(cue) {
+    const b = buffers.get(cue.rank);
+    if (!b) return;
+    duckFilm(b.duration);
+    const src = ctx.createBufferSource();
+    src.buffer = b;
+    src.connect(ctx.destination);
+    src.start();
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="t">${cue.t.toFixed(1)}s</span><br>${cue.text}`;
+    log.prepend(li);
+  }
+
+  async function connect() {
+    const res = await fetch('state');
+    const s = await res.json();
+    if (!timeline && s.timeline) {
+      timeline = s.timeline;
+      await Promise.all(timeline.cues.map(fetchBuffer));
+      askSection.hidden = false;
+      if (mode === 'standalone') film.src = timeline.media;
+      say(`Ready. ${timeline.cues.length} descriptions.`);
+    }
+    return s;
+  }
+
+  function fireCues(t) {
+    if (!timeline) return;
+    for (const cue of timeline.cues) {
+      if (!played.has(cue.rank) && cue.t <= t && t - cue.t < 4) {
+        played.add(cue.rank);
+        play(cue);
+      }
+    }
+  }
+
+  // Standalone: the film is here, so duck it under each description exactly as
+  // the television does. Without this the score buries the voice at its peaks.
+  let duckTimer = null;
+  function duckFilm(seconds) {
+    if (mode !== 'standalone') return;
+    clearTimeout(duckTimer);
+    film.volume = 0.22;
+    duckTimer = setTimeout(() => { film.volume = 1; }, seconds * 1000 + 260);
+  }
+
+  async function tick() {
+    if (!running) return;
+    if (mode === 'standalone') {
+      lastT = film.currentTime || 0;
+      statusLine.textContent = film.paused ? 'Paused' : 'Playing';
+      detail.textContent = `${lastT.toFixed(0)} seconds in`;
+      fireCues(lastT);
+      return;
+    }
+    let s;
+    try { s = await connect(); }
+    catch { statusLine.textContent = 'Lost the television'; detail.textContent = 'Trying again.'; return; }
+
+    // The TV reports its position a few times a second; estimate between reports
+    // so description does not arrive in steps.
+    const age = s.age == null ? null : s.age;
+    const t = s.playing && age != null ? s.t + age * (s.rate || 1) : s.t;
+    lastT = t;
+
+    if (age == null || age > 3) {
+      statusLine.textContent = 'Waiting for the television';
+      detail.textContent = 'Start playback on the Fire TV.';
+    } else {
+      statusLine.textContent = s.playing ? 'Playing' : 'Paused';
+      detail.textContent = `${t.toFixed(0)} seconds in, ${s.rate || 1}x speed`;
+      if (lastAge !== null && (age > 3) !== (lastAge > 3)) say(statusLine.textContent);
+      lastAge = age;
+    }
+
+    if (timeline) {
+      for (const cue of timeline.cues) {
+        if (!played.has(cue.rank) && cue.t <= t && t - cue.t < 4) {
+          played.add(cue.rank);
+          play(cue);
+        }
+      }
+    }
+  }
+
+  async function begin(which) {
+    mode = which;
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') await ctx.resume();
+    running = true;
+    startBtn.setAttribute('aria-pressed', 'true');
+    startBtn.classList.remove('primary');
+    await connect();
+    if (mode === 'standalone') {
+      startBtn.textContent = 'Playing with description';
+      followBtn.hidden = true;
+      film.hidden = false;
+      say('Playing with description.');
+      try { await film.play(); } catch { say('Press play on the video.'); }
+    } else {
+      startBtn.hidden = true;
+      followBtn.textContent = 'Following the television';
+      film.hidden = true;
+      say('Listening for the television.');
+    }
+    tick();
+    setInterval(tick, 250);
+  }
+
+  startBtn.addEventListener('click', () => begin('standalone'));
+  followBtn.addEventListener('click', () => begin('follow'));
+  film.hidden = true;
+
+  // Interactive description. The Fire TV has no app-level speech recognition,
+  // so a spoken question can only ever begin on this device — which is the
+  // reason the companion channel had to exist before this could.
+  async function ask(question) {
+    answerBox.hidden = false;
+    answerText.textContent = 'Asking…';
+    answerMeta.textContent = question;
+    say('Asking.');
+    try {
+      const res = await fetch('ask', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({question, t: lastT}),
+      });
+      const a = await res.json();
+      if (a.error) {
+        answerText.textContent = 'Could not answer.';
+        answerMeta.textContent = a.error;
+        return say('Could not answer.');
+      }
+      answerText.textContent = a.answer;
+      answerMeta.textContent = `asked at ${a.asked_at}s`;
+      // Announce immediately — a blind user should not wait on the audio
+      // fetch to know the answer arrived.
+      say(a.answer);
+      const buf = await (await fetch(a.audio)).arrayBuffer();   // answers stay wav; they are generated live
+      const decoded = await ctx.decodeAudioData(buf);
+      const src = ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(ctx.destination);
+      src.start();
+    } catch (e) {
+      answerText.textContent = 'Could not reach the service.';
+      say('Could not reach the service.');
+    }
+  }
+
+  document.querySelectorAll('button.quick').forEach((b) =>
+    b.addEventListener('click', () => ask(b.dataset.q)));
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    // Not every mobile browser has it. The preset questions are the fallback,
+    // and they are also faster than speaking for the common cases.
+    askVoice.textContent = 'Voice not available on this browser';
+    askVoice.disabled = true;
+  } else {
+    askVoice.addEventListener('click', () => {
+      const rec = new SR();
+      rec.lang = 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      askVoice.textContent = 'Listening — speak now';
+      say('Listening.');
+      rec.onresult = (e) => ask(e.results[0][0].transcript);
+      rec.onerror = () => { say('Did not catch that.'); };
+      rec.onend = () => { askVoice.textContent = 'Hold to ask a question'; };
+      rec.start();
+    });
+  }
+})();
+</script>
+</html>
