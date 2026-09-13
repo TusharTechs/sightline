@@ -770,3 +770,87 @@ registry at build time, where the manifest is already being parsed and validated
 (the build emits `manifest validation found 0 errors` for a manifest containing
 a fictional service). A `vega device installed-services` command, or service
 grant status in `vega project doctor`, would also close the gap.
+
+---
+
+## FL-015 — Remote input: the documented API does not exist, and the documented event field has the wrong name
+
+**Severity:** High
+
+**Task attempted.** Handle remote control button presses in a React Native for
+Vega app — play/pause, D-pad, Menu.
+
+**Steps taken.** Followed React Native's own TV documentation, which is what a
+developer arriving from React Native will read:
+
+```ts
+import {TVEventHandler} from 'react-native';
+```
+
+Then, having found that wrong, used the Vega API and filtered key-up events
+using the field name given in the SDK's own type definitions.
+
+**Expected.** Buttons work.
+
+**Actual.** Three separate failures, each of which fails silently.
+
+**1. `TVEventHandler` does not exist in `react-native` on this platform.** The
+correct API is `useTVEventHandler` from `@amazon-devices/react-native-kepler`.
+Nothing in the Vega media or app documentation we read mentions this; it is only
+visible by finding the file in `node_modules`. Written defensively — which is
+normal for an API that may be absent — the failure is completely silent:
+
+```ts
+const sub = TVEventHandler.addListener?.(handler);   // registers nothing, no error
+```
+
+Every button on the remote did nothing for two days, with no error anywhere.
+
+**2. The runtime event field is `eventKeyAction`. The SDK documents it as
+`eventAction`.** From `react-native-kepler/Libraries/TV/TVTypes.d.ts`:
+
+```
+ *  eventAction:
+ *       0 : The respective key is in the pressed/KEY_DOWN state.
+ *       1 : The respective key is in the released/KEY_UP state.
+```
+
+The actual event delivered:
+
+```json
+{"eventId":1,"eventKeyAction":0,"eventType":"enter"}
+```
+
+So `if (evt.eventAction === 1) return;` — written directly from the
+documentation — matches nothing. Both halves of every press are handled, so each
+press fires twice and every toggle instantly undoes itself. This looks like a
+race condition rather than a naming error, which is what makes it expensive.
+
+**3. Enter arrives as `eventType: "enter"`, not `"select"`.** Both appear in the
+documented `HWEvent` union with no indication of which a remote's select button
+produces. `KEY_ENTER` via `inputd-cli`, and the virtual device's own on-screen
+remote, both deliver `enter`.
+
+**Workaround.** Use `useTVEventHandler` from `@amazon-devices/react-native-kepler`,
+filter on `eventKeyAction`, and handle `enter`, `select` and `playpause` together.
+
+**How to see what is really arriving.** Since app `console.log` goes to the VS
+Code output channel and is not readable from a scripted run, the fastest way to
+find all three of these was to make the handler report each raw event to an HTTP
+endpoint on the host, then inject keys with
+`vega device run-cmd -c "inputd-cli button_press KEY_ENTER"`. That removes the
+question of whether the window is forwarding keystrokes at all, and it prints
+the true event shape rather than the documented one.
+
+**Actionable suggestion.**
+
+1. **Correct `TVTypes.d.ts`** so the documented field name matches the delivered
+   one, or emit both. A type definition that disagrees with the runtime is worse
+   than none, because it is the thing developers trust most.
+2. **Say in the Vega app documentation that `useTVEventHandler` comes from
+   `@amazon-devices/react-native-kepler`**, and that React Native's own
+   `TVEventHandler` is not available. Porting developers will reach for the
+   React Native one first — it is what every React Native TV tutorial shows.
+3. **State which `eventType` a remote's select button produces.** Listing both
+   `enter` and `select` in the union without saying which arrives leaves
+   developers to guess, and guessing wrong fails silently.
