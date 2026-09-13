@@ -64,16 +64,35 @@ def main():
     a = p.parse_args()
 
     os.makedirs(a.out, exist_ok=True)
-    manifest = {}
+    path = os.path.join(a.out, "ui-voice.json")
+
+    # These phrases never change between runs, and re-rendering all of them —
+    # the controls list alone is nearly thirteen seconds — was most of the wait
+    # when regenerating a bundle. Only synthesise what is missing or reworded.
+    previous = {}
+    if os.path.exists(path):
+        try:
+            previous = json.load(open(path))
+        except Exception:
+            previous = {}
+
+    manifest, made, kept = {}, 0, 0
     for key, text in PHRASES.items():
         name = f"{a.prefix}{key}.pcm"
+        old = previous.get(key)
+        if old and old.get("text") == text and os.path.exists(os.path.join(a.out, name)):
+            manifest[key] = old
+            kept += 1
+            continue
         meta = synthesize(text, os.path.join(a.out, name))
         manifest[key] = {"pcm": name, "text": text, "duration": meta["duration_s"]}
+        made += 1
         print(f"  {key:<14} {meta['duration_s']:>5}s  {text[:58]}", file=sys.stderr)
+    if kept:
+        print(f"  reused {kept} unchanged phrase(s)", file=sys.stderr)
 
-    path = os.path.join(a.out, "ui-voice.json")
     json.dump(manifest, open(path, "w"), indent=2)
-    print(f"\n{len(manifest)} phrases -> {path}", file=sys.stderr)
+    print(f"\n{len(manifest)} phrases ({made} rendered) -> {path}", file=sys.stderr)
 
 
 if __name__ == "__main__":
