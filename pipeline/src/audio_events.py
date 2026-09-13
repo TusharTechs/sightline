@@ -44,12 +44,36 @@ MIN_SEPARATION_S = 0.12
 # it in a few milliseconds. Music takes hundreds.
 FINE_MS = 5
 ATTACK_RANGE_DB = 12.0
-# At or under this, treat it as a transient. Over it, it is a swell and we say
-# nothing — a miss costs the viewer nothing, a false alarm costs them the next
-# thirty seconds.
-ATTACK_MAX_MS = 60.0
+# There is deliberately no single attack threshold here any more. One number
+# had to be defended and could not be: a listener does not hear the rise, so no
+# ear can tell you where to put it. See FAST_MS / SLOW_MS and the tail below.
 # How far either side of a coarse onset to look for the true peak.
 REFINE_WINDOW_S = 0.30
+
+# The tail, which is the half the attack cannot see.
+#
+# Same reviewer, after declining to give me a better threshold:
+#
+#   "A listener doesn't hear the rise. Nobody ever sat in a chair and clocked 60
+#    milliseconds... A hit arrives and then falls away. That's the half you
+#    aren't using yet. Score comes up and then it stays up. So for anything
+#    close to your boundary, look at what happens after the peak. Back down
+#    inside a second, that's an event. Still sitting there two seconds later,
+#    that's the music."
+#
+# So the attack decides only the clear cases, and the tail decides the rest.
+# Below FAST_MS the crack is already past the listener and nothing else needs
+# asking; above SLOW_MS it plainly ramped. Between the two, the attack is not
+# evidence and the decay is.
+FAST_MS = 30.0
+SLOW_MS = 120.0
+TAIL_WINDOW_S = 0.20      # width of each level probe
+TAIL_SHORT_S = 1.0        # "back down inside a second"
+TAIL_LONG_S = 2.0         # "still sitting there two seconds later"
+TAIL_FELL_DB = 6.0        # fallen this far by TAIL_SHORT_S -> it was an event
+TAIL_HELD_DB = 3.0        # still within this of peak at TAIL_LONG_S -> music
+# Extra audio loaded past the window so the tail of a late onset is measurable.
+TAIL_PAD_S = TAIL_LONG_S + TAIL_WINDOW_S
 
 
 def load_mono(media, start, end):
@@ -66,33 +90,86 @@ def load_mono(media, start, end):
 
 
 def attack_ms(x, centre_s, window_s=REFINE_WINDOW_S):
-    """How fast did the level get to its peak, in milliseconds.
+    """How fast did the level get to its peak, in milliseconds, and where the
+    peak was (seconds into x).
 
-    Returns None when it cannot be measured. Callers treat that as "not sure",
-    and not sure means stay quiet.
+    Returns (None, None) when it cannot be measured. Callers treat that as "not
+    sure", and not sure means stay quiet.
     """
     n = max(1, int(SR * FINE_MS / 1000))
     lo = max(0, int((centre_s - window_s) * SR))
     hi = min(x.size, int((centre_s + window_s) * SR))
     seg = x[lo:hi]
     if seg.size < n * 4:
-        return None
+        return None, None
     frames = seg[: (seg.size // n) * n].reshape(-1, n)
     db = 20 * np.log10(np.sqrt((frames ** 2).mean(axis=1)) + 1e-9)
     peak = int(np.argmax(db))
+    peak_s = (lo + peak * n) / SR
     if peak == 0:
-        return None
+        return None, peak_s
     floor = db[peak] - ATTACK_RANGE_DB
     i = peak
     while i > 0 and db[i] > floor:
         i -= 1
     if db[i] > floor:            # never got that far below; cannot tell
+        return None, peak_s
+    return (peak - i) * FINE_MS, peak_s
+
+
+def _level_db(x, centre_s, width_s=TAIL_WINDOW_S):
+    """RMS level in dB over a short window, or None if it runs off the end."""
+    lo = int((centre_s - width_s / 2) * SR)
+    hi = int((centre_s + width_s / 2) * SR)
+    if lo < 0 or hi > x.size or hi - lo < SR // 100:
         return None
-    return (peak - i) * FINE_MS
+    seg = x[lo:hi]
+    return float(20 * np.log10(np.sqrt((seg ** 2).mean()) + 1e-9))
+
+
+def decay(x, peak_s):
+    """How far the level had fallen from its peak one second later, and two.
+
+    Either may be None when there is not enough audio after the peak to look.
+    An event drops away; music does not.
+    """
+    top = _level_db(x, peak_s)
+    if top is None:
+        return None, None
+    out = []
+    for dt in (TAIL_SHORT_S, TAIL_LONG_S):
+        later = _level_db(x, peak_s + dt)
+        out.append(None if later is None else round(top - later, 1))
+    return out[0], out[1]
+
+
+def shape_of(x, centre_s):
+    """Is this a hit or a swell? Returns (attack_ms, fell_1s, fell_2s, verdict)
+    where verdict is True for a hit, False for a swell, and None for not sure.
+
+    The attack settles the clear cases. Everything near the boundary is settled
+    by the tail instead, and anything ambiguous on both is left alone.
+    """
+    a, peak_s = attack_ms(x, centre_s)
+    if a is None:
+        return None, None, None, None
+    if a < FAST_MS:
+        return a, None, None, True
+    if a > SLOW_MS:
+        return a, None, None, False
+
+    fell_1s, fell_2s = decay(x, peak_s)
+    if fell_1s is not None and fell_1s >= TAIL_FELL_DB:
+        return a, fell_1s, fell_2s, True          # gone inside a second
+    if fell_2s is not None and fell_2s < TAIL_HELD_DB:
+        return a, fell_1s, fell_2s, False         # still sitting there
+    return a, fell_1s, fell_2s, None              # tie goes to silence
 
 
 def analyse(media, start, end):
-    x = load_mono(media, start, end)
+    # Load past the end so a late onset still has a tail to measure. Detection
+    # and the level summary stay inside the real window.
+    x = load_mono(media, start, end + TAIL_PAD_S)
     if x.size == 0:
         return {"window": [start, end], "onsets": [], "level_db": -120.0,
                 "character": "silent"}
@@ -102,9 +179,10 @@ def analyse(media, start, end):
     rms = np.sqrt((frames ** 2).mean(axis=1)) + 1e-9
     db = 20 * np.log10(rms)
 
+    inside = int(round((end - start) * 1000 / FRAME_MS))
     look = max(3, int(400 / FRAME_MS))
     onsets = []
-    for i in range(look, db.size):
+    for i in range(look, min(db.size, inside)):
         local = np.median(db[i - look:i])
         rise = db[i] - local
         if rise >= ONSET_DB:
@@ -117,26 +195,37 @@ def analyse(media, start, end):
             else:
                 onsets.append({"t": round(t, 2), "rise_db": round(rise, 1)})
 
-    # Now measure the shape of each, and keep only the transients.
+    # Now measure the shape of each, and keep only the hits.
     for o in onsets:
-        a = attack_ms(x, o["t"] - start)
+        a, fell_1s, fell_2s, verdict = shape_of(x, o["t"] - start)
         o["attack_ms"] = a
-        o["transient"] = (a is not None and a <= ATTACK_MAX_MS)
+        if fell_1s is not None:
+            o["fell_1s_db"] = fell_1s
+        if fell_2s is not None:
+            o["fell_2s_db"] = fell_2s
+        o["transient"] = bool(verdict)
+        if verdict is None:
+            o["unsure"] = True
 
     # Only hits are counted as events. A swell is the music getting louder,
     # which is not something that happened -- describing it would tell the
     # viewer about the score rather than about the film.
     hits = [o for o in onsets if o["transient"]]
-    swells = len(onsets) - len(hits)
+    # An onset we could not call is not a swell. Saying "music rising" about it
+    # would be inventing evidence in the other direction.
+    swells = [o for o in onsets if not o["transient"] and not o.get("unsure")]
 
-    level = float(np.median(db))
-    spread = float(db.max() - np.median(db))
+    win = db[:inside] if inside > 0 else db
+    level = float(np.median(win))
+    spread = float(win.max() - np.median(win))
     if level < -50:
         character = "silent"
     elif hits:
         character = f"{len(hits)} distinct sound event(s)"
     elif swells:
         character = "music rising, but nothing arrives"
+    elif onsets:
+        character = "sound whose shape could not be called either way"
     elif spread < 8:
         character = "continuous (music or ambience, no distinct events)"
     else:
@@ -193,10 +282,14 @@ def describe_for_prompt(info, dialogue="", checked=None):
         bits.append("Audible events occurred but were not checked against the "
                     "picture.")
     if not any(o.get("transient") for o in info["onsets"]):
-        swelled = bool(info["onsets"])
+        swelled = any(not o.get("unsure") for o in info["onsets"])
+        unsure = any(o.get("unsure") for o in info["onsets"])
         bits.append(
             ("The music rises here but nothing arrives — a swell is not an event. "
-             if swelled else "No distinct audible events. ") +
+             if swelled else
+             "Something audible happened but its shape could not be called an "
+             "event either way, so treat this stretch as unaccounted for rather "
+             "than silent. " if unsure else "No distinct audible events. ") +
             "Anything that changed on screen was silent, and the viewer has no "
             "other way to know it.")
 
