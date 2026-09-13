@@ -54,8 +54,8 @@
 <button id="follow">Follow a Fire TV instead</button>
 
 <div class="status" role="status" aria-live="polite">
-  <b id="statusLine">Not connected</b>
-  <span class="dim" id="detail">Press Start listening to connect to the television.</span>
+  <b id="statusLine">Ready</b>
+  <span class="dim" id="detail">Press Play with description to start.</span>
 </div>
 
 <section id="askSection" hidden aria-labelledby="askHead">
@@ -128,16 +128,26 @@
     log.prepend(li);
   }
 
+  async function loadTimeline(tl) {
+    if (timeline) return;
+    timeline = tl;
+    await Promise.all(timeline.cues.map(fetchBuffer));
+    if (mode === 'standalone') film.src = timeline.media;
+    say(`Ready. ${timeline.cues.length} descriptions.`);
+  }
+
   async function connect() {
-    const res = await fetch('state');
-    const s = await res.json();
-    if (!timeline && s.timeline) {
-      timeline = s.timeline;
-      await Promise.all(timeline.cues.map(fetchBuffer));
-      askSection.hidden = false;
-      if (mode === 'standalone') film.src = timeline.media;
-      say(`Ready. ${timeline.cues.length} descriptions.`);
+    // Standalone reads the timeline straight off disk. It must not depend on a
+    // service endpoint — the hosted build is static files and nothing else, and
+    // asking it for /state is how this silently failed to start.
+    if (mode === 'standalone') {
+      if (!timeline) {
+        await loadTimeline(await (await fetch('timeline.json')).json());
+      }
+      return null;
     }
+    const s = await (await fetch('state')).json();
+    if (s.timeline) await loadTimeline(s.timeline);
     return s;
   }
 
@@ -212,10 +222,26 @@
       startBtn.textContent = 'Playing with description';
       followBtn.hidden = true;
       film.hidden = false;
+      // Answers are generated live against the current frame, so they need a
+      // service. Offer the button only where one is actually reachable rather
+      // than letting someone press something that cannot work.
+      try {
+        const probe = await fetch('ask', {method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question: '', t: 0})});
+        // Our service answers 400 to an empty question; static hosting gives
+        // 404, 403 or 501 depending on the host. Show the button only for the
+        // former — the earlier test was inverted and would have hidden it
+        // exactly where it works.
+        askSection.hidden = !(probe.status === 200 || probe.status === 400);
+      } catch {
+        askSection.hidden = true;
+      }
       say('Playing with description.');
       try { await film.play(); } catch { say('Press play on the video.'); }
     } else {
       startBtn.hidden = true;
+      askSection.hidden = false;
       followBtn.textContent = 'Following the television';
       film.hidden = true;
       say('Listening for the television.');

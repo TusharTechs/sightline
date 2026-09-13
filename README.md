@@ -41,7 +41,7 @@ The quickest way to check this is real rather than described:
 | **what we learned about Vega** | [`FRICTION-LOG.md`](FRICTION-LOG.md) (15 entries) and [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) |
 | **what is not finished** | [`STATUS.md`](STATUS.md) — kept honest, including what no blind user has tested yet |
 
-**Fastest check of all:** [d1ie12b84zbad7.cloudfront.net](https://tushartechs.github.io/sightline/) — press play and listen. Nothing to
+**Fastest check of all:** [tushartechs.github.io/sightline](https://tushartechs.github.io/sightline/) — press play and listen. Nothing to
 install. The submission video is not made yet.
 
 ## In thirty seconds
@@ -87,7 +87,7 @@ pixels across, and it is the shot.*
 
 ## Try it without a Fire TV
 
-### ▶ [d1ie12b84zbad7.cloudfront.net](https://tushartechs.github.io/sightline/)
+### ▶ [tushartechs.github.io/sightline](https://tushartechs.github.io/sightline/)
 
 Open it on anything and press **Play with description**. No device, no SDK, no
 install — the same timeline and the same generated audio that the Fire TV app
