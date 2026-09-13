@@ -75,7 +75,7 @@ part with all the work in it — never appears on screen.
 
 ### 4. No blind user has actually used it.
 
-the ADP list reviewer has shaped the design through correspondence and has the clips, but has
+The reviewer has shaped the design through correspondence and has the clips, but has
 not played them yet. Nobody has operated the app or the phone. Every quality
 claim rests on my judgement and one fixture I wrote myself.
 
