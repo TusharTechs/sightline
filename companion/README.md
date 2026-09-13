@@ -38,9 +38,30 @@ Its entire audience is blind. Large touch targets, a single primary action,
 semantic landmarks, and an `aria-live` region that announces state changes.
 Audio is unlocked by the Start gesture because mobile browsers require one.
 
-## Not built yet
+## Interactive description
 
-The **What's happening right now?** button is the entry point for interactive
-description, and it is deliberately here rather than on the television: Vega has
-no app-level speech recognition (FRICTION-LOG FL-004), so a spoken question can
-only ever begin on this device.
+Ask about the moment you are on. By voice where the browser supports it, or from
+preset questions, which are also faster than speaking for the common cases.
+
+This is on the phone rather than the television for a hard reason: Vega has no
+app-level speech recognition (FRICTION-LOG FL-004), so a spoken question can
+only ever begin on this device. Building the companion channel was the
+prerequisite for it existing at all.
+
+It is also the thing a pre-recorded description track structurally cannot do.
+Every batch tool decides in advance what is worth saying. Only something running
+at playback time can answer a question about the frame in front of you — and
+only because the viewer chose the moment.
+
+Two behaviours that matter more than they look:
+
+- **It answers the question and stops.** A second description is not an answer;
+  the viewer asked because the description did not cover it.
+- **It admits what it cannot see.** Real replies from the trailer include *"I
+  can't be sure it's her"* and *"No room is shown — just the title card on
+  black."* For someone who cannot check, a confident wrong answer is far worse
+  than an admission.
+
+**Known cost:** about 7 seconds from question to answer. Acceptable when the
+viewer has chosen to interrupt, but it should be faster, and shaving it must not
+be paid for with worse answers.

@@ -22,6 +22,8 @@
     padding: 16px; text-align: left;
   }
   button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.quick { min-height: 58px; font-size: 17px; font-weight: 500; }
+  button:disabled { opacity: 0.55; }
   button:active { transform: scale(0.99); }
   button[aria-pressed="true"] { border-color: #3ddc97; }
   button:focus-visible { outline: 3px solid #3ddc97; outline-offset: 2px; }
@@ -47,7 +49,17 @@
   <span class="dim" id="detail">Press Start listening to connect to the television.</span>
 </div>
 
-<button id="ask" hidden>What's happening right now?</button>
+<section id="askSection" hidden aria-labelledby="askHead">
+  <h2 id="askHead" class="sub" style="margin:22px 0 10px">Ask about this moment</h2>
+  <button id="askVoice" class="primary">Hold to ask a question</button>
+  <button class="quick" data-q="What's happening right now?">What's happening right now?</button>
+  <button class="quick" data-q="Who else is in this scene?">Who else is in this scene?</button>
+  <button class="quick" data-q="What is she carrying?">What is she carrying?</button>
+  <div class="status" id="answerBox" role="status" aria-live="polite" hidden>
+    <b id="answerText"></b>
+    <span class="dim" id="answerMeta"></span>
+  </div>
+</section>
 
 <div class="said" aria-live="off">
   <h2>Described so far</h2>
@@ -60,7 +72,11 @@
 (() => {
   const el = (id) => document.getElementById(id);
   const statusLine = el('statusLine'), detail = el('detail'), log = el('log');
-  const announce = el('announce'), startBtn = el('start'), askBtn = el('ask');
+  const announce = el('announce'), startBtn = el('start');
+  const askSection = el('askSection'), askVoice = el('askVoice');
+  const answerBox = el('answerBox'), answerText = el('answerText'),
+        answerMeta = el('answerMeta');
+  let lastT = 0;
 
   let ctx = null;            // unlocked by the Start gesture; mobile requires it
   let timeline = null;
@@ -95,7 +111,7 @@
     if (!timeline && s.timeline) {
       timeline = s.timeline;
       await Promise.all(timeline.cues.map(fetchBuffer));
-      askBtn.hidden = false;
+      askSection.hidden = false;
       say(`Connected. ${timeline.cues.length} descriptions ready.`);
     }
     return s;
@@ -111,6 +127,7 @@
     // so description does not arrive in steps.
     const age = s.age == null ? null : s.age;
     const t = s.playing && age != null ? s.t + age * (s.rate || 1) : s.t;
+    lastT = t;
 
     if (age == null || age > 3) {
       statusLine.textContent = 'Waiting for the television';
@@ -144,12 +161,66 @@
     setInterval(tick, 300);
   });
 
-  // Capability 3 lives here. The Fire TV has no app-level speech recognition,
-  // so a question can only ever start from this device.
-  askBtn.addEventListener('click', () => {
-    say('Asking is not built yet.');
-    detail.textContent = 'Questions are not implemented yet.';
-  });
+  // Interactive description. The Fire TV has no app-level speech recognition,
+  // so a spoken question can only ever begin on this device — which is the
+  // reason the companion channel had to exist before this could.
+  async function ask(question) {
+    answerBox.hidden = false;
+    answerText.textContent = 'Asking…';
+    answerMeta.textContent = question;
+    say('Asking.');
+    try {
+      const res = await fetch('ask', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({question, t: lastT}),
+      });
+      const a = await res.json();
+      if (a.error) {
+        answerText.textContent = 'Could not answer.';
+        answerMeta.textContent = a.error;
+        return say('Could not answer.');
+      }
+      answerText.textContent = a.answer;
+      answerMeta.textContent = `asked at ${a.asked_at}s`;
+      // Announce immediately — a blind user should not wait on the audio
+      // fetch to know the answer arrived.
+      say(a.answer);
+      const buf = await (await fetch(a.audio)).arrayBuffer();
+      const decoded = await ctx.decodeAudioData(buf);
+      const src = ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(ctx.destination);
+      src.start();
+    } catch (e) {
+      answerText.textContent = 'Could not reach the service.';
+      say('Could not reach the service.');
+    }
+  }
+
+  document.querySelectorAll('button.quick').forEach((b) =>
+    b.addEventListener('click', () => ask(b.dataset.q)));
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    // Not every mobile browser has it. The preset questions are the fallback,
+    // and they are also faster than speaking for the common cases.
+    askVoice.textContent = 'Voice not available on this browser';
+    askVoice.disabled = true;
+  } else {
+    askVoice.addEventListener('click', () => {
+      const rec = new SR();
+      rec.lang = 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      askVoice.textContent = 'Listening — speak now';
+      say('Listening.');
+      rec.onresult = (e) => ask(e.results[0][0].transcript);
+      rec.onerror = () => { say('Did not catch that.'); };
+      rec.onend = () => { askVoice.textContent = 'Hold to ask a question'; };
+      rec.start();
+    });
+  }
 })();
 </script>
 </html>

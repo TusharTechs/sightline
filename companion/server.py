@@ -15,8 +15,11 @@ The TV reports where it is in the media; the phone follows. The TV never has to
 listen on a socket, which is just as well since description generation already
 needs a service to live in.
 """
-import json, os, struct, threading, time
+import base64, json, os, struct, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "..", "pipeline", "src"))
 
 BUNDLE = os.environ.get("SIGHTLINE_BUNDLE", "/tmp/sightline-serve")
 PORT = int(os.environ.get("SIGHTLINE_PORT", "8099"))
@@ -35,6 +38,90 @@ def wav_header(nbytes, rate=48000, channels=2, bits=16):
     return (b"RIFF" + struct.pack("<I", 36 + nbytes) + b"WAVEfmt "
             + struct.pack("<IHHIIHH", 16, 1, channels, rate, byte_rate, block, bits)
             + b"data" + struct.pack("<I", nbytes))
+
+
+ANSWER_PROMPT = """A blind viewer is watching a film and has paused to ask you a
+question about what is on screen right now. The frame is attached.
+
+Their question: "{question}"
+
+Answer it. Nothing else.
+
+- Answer ONLY what was asked. Do not narrate the scene, do not set it up, do not
+  add what you think they might want next. They asked a question because the
+  description did not cover it; a second description is not an answer.
+- If the frame does not show the answer, say so plainly in a few words. Guessing
+  is worse than "I can't see that from here".
+- At most {max_words} words. Spoken aloud, present tense, plain.
+- Do not describe the filming — angles, framing, focus, lighting. Only what is
+  in the picture.
+
+{context}"""
+
+
+def _frame_at(media, t, out):
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{t:.3f}",
+                    "-i", media, "-frames:v", "1", "-vf", "scale=1280:-2", out],
+                   check=True)
+
+
+def answer_question(question, t, max_words=30):
+    """Look at the frame the viewer is on, and answer what they asked.
+
+    This is the thing a pre-recorded description track structurally cannot do.
+    Every batch tool decides in advance what is worth saying; only something
+    running at playback time can answer a question about the frame in front of
+    you, and only because the viewer is the one who chose the moment.
+    """
+    import salience
+    from speech import synthesize
+
+    with LOCK:
+        tl = STATE.get("timeline_cache")
+    tlp = os.path.join(BUNDLE, "timeline.json")
+    tl = json.load(open(tlp)) if os.path.exists(tlp) else None
+    if not tl:
+        return {"error": "no timeline loaded"}
+
+    media = os.path.join(BUNDLE, tl["media"])
+    said = [c["text"] for c in sorted(tl["cues"], key=lambda c: c["t"]) if c["t"] <= t]
+    context = ("Already described to them, so do not repeat it:\n"
+               + "\n".join(f"- {x}" for x in said[-4:])) if said else \
+              "Nothing has been described yet."
+
+    with tempfile.TemporaryDirectory() as td:
+        png = os.path.join(td, "f.png")
+        _frame_at(media, t, png)
+
+        from pydantic import BaseModel, Field
+
+        class Answer(BaseModel):
+            answer: str = Field(description=f"at most {max_words} words")
+            can_see: bool = Field(description="was the answer visible in the frame")
+
+        content = [
+            {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                         "data": base64.standard_b64encode(
+                                             open(png, "rb").read()).decode()}},
+            {"type": "text", "text": ANSWER_PROMPT.format(
+                question=question, max_words=max_words, context=context)},
+        ]
+        import anthropic
+        client = anthropic.Anthropic()
+        parsed = client.messages.parse(
+            model=os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5"),
+            max_tokens=8000,
+            thinking={"type": "adaptive"},
+            messages=[{"role": "user", "content": content}],
+            output_format=Answer,
+        ).parsed_output
+
+        name = f"answer-{int(time.time()*1000)}.pcm"
+        meta = synthesize(parsed.answer, os.path.join(BUNDLE, name))
+
+    return {"answer": parsed.answer, "can_see": parsed.can_see,
+            "audio": name.replace(".pcm", ".wav"), "duration": meta["duration_s"],
+            "asked_at": round(t, 2)}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -58,6 +145,23 @@ class Handler(BaseHTTPRequestHandler):
                                     "Access-Control-Allow-Methods": "GET,POST,OPTIONS"})
 
     def do_POST(self):
+        if self.path == "/ask":
+            n = int(self.headers.get("Content-Length", 0))
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except Exception:
+                data = {}
+            q = (data.get("question") or "").strip()
+            if not q:
+                return self._send(400, json.dumps({"error": "no question"}))
+            # The viewer chose this moment; use where the TV actually is.
+            with LOCK:
+                t = float(data.get("t", STATE.get("t", 0.0)))
+            try:
+                return self._send(200, json.dumps(answer_question(q, t)))
+            except Exception as e:
+                return self._send(500, json.dumps({"error": str(e)[:200]}))
+
         if self.path != "/position":
             return self._send(404, b"{}")
         n = int(self.headers.get("Content-Length", 0))
