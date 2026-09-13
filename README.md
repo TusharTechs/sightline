@@ -97,12 +97,12 @@ You do need to run the service, which is one command after cloning:
 SIGHTLINE_BUNDLE=/path/to/bundle pipeline/.venv/bin/python companion/server.py
 ```
 
-Then open `http://localhost:8099/` and press **Play with description**. You get
+Then open `http://localhost:8190/` and press **Play with description**. You get
 the film with generated description ducked over it, and the **Ask about this
 moment** buttons work — the answer comes from the frame you are actually on.
 
 On the same network, other devices can reach it at your machine's LAN address
-(`http://192.168.x.x:8099/`) — useful for testing on a phone, but it is a
+(`http://192.168.x.x:8190/`) — useful for testing on a phone, but it is a
 private address and will not work from anywhere else.
 
 It is the product minus the television. The page is built for a screen reader:
@@ -279,7 +279,7 @@ vega device install-app -p build/aarch64-debug/sightline_aarch64.vpkg
 vega device launch-app -a com.sightline.tv.main
 ```
 
-Then open `http://<your-lan-ip>:8099/` on a phone on the same network.
+Then open `http://<your-lan-ip>:8190/` on a phone on the same network.
 
 **Remote:** Select plays/pauses · Right changes speed · Up switches mode ·
 Down moves description to the phone · Menu speaks the controls.

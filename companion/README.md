@@ -17,7 +17,7 @@ is a mode on the device rather than a slider.
 SIGHTLINE_BUNDLE=/tmp/sightline-serve python3 companion/server.py
 ```
 
-Then open `http://<your-lan-ip>:8099/` on a phone on the same network and press
+Then open `http://<your-lan-ip>:8190/` on a phone on the same network and press
 **Start listening**. On the television remote, **Down** toggles between solo and
 co-viewing.
 
