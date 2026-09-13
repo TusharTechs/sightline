@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from salience import describe_film_change, onset_has_visible_cause
 from speech import budget_words, synthesize
-from audio_events import analyse, describe_for_prompt, loudest
+from audio_events import analyse, describe_for_prompt, worth_checking
 
 FRAME_WIDTH = 1280     # 800px was slower AND lost detail; measured, not assumed
 # A long gap gets described more than once. Sixteen seconds of silence in a film
@@ -128,7 +128,7 @@ def main():
         # screen to account for it is the single most useful thing to describe;
         # a noise with a visible cause is the least.
         checked = []
-        for o in loudest(audio["onsets"], ONSET_CHECKS):
+        for o in worth_checking(audio["onsets"], ONSET_CHECKS):
             ob = os.path.join(td, f"o{i}_{o['t']}_b.png")
             oa = os.path.join(td, f"o{i}_{o['t']}_a.png")
             try:

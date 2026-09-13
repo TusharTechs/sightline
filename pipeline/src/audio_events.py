@@ -22,10 +22,34 @@ import numpy as np
 
 SR = 16000
 FRAME_MS = 20
-# An onset is this many dB above the trailing median of the last ~400ms.
+# A candidate onset is this many dB above the trailing median of the last ~400ms.
+# This finds loud moments. It does NOT distinguish a hit from a swell, which is
+# the whole problem — see attack_ms below.
 ONSET_DB = 7.0
 # Don't report two onsets closer together than this.
 MIN_SEPARATION_S = 0.12
+
+# Attack, measured at fine resolution.
+#
+# From the ADP list reviewer, and it is the separation the magnitude test could
+# never make:
+#
+#   "A swell and a hit are different shapes, not different sizes. Score comes up
+#    over a second or two. It ramps. An impact is at full the instant it starts
+#    and then it falls away. So measure how fast the level got there rather than
+#    how far it got... That's the whole reason a compressor has an attack
+#    control."
+#
+# So: how long did it take to climb the last 12 dB into its peak? An impact does
+# it in a few milliseconds. Music takes hundreds.
+FINE_MS = 5
+ATTACK_RANGE_DB = 12.0
+# At or under this, treat it as a transient. Over it, it is a swell and we say
+# nothing — a miss costs the viewer nothing, a false alarm costs them the next
+# thirty seconds.
+ATTACK_MAX_MS = 60.0
+# How far either side of a coarse onset to look for the true peak.
+REFINE_WINDOW_S = 0.30
 
 
 def load_mono(media, start, end):
@@ -39,6 +63,32 @@ def load_mono(media, start, end):
         with wave.open(wav) as w:
             raw = w.readframes(w.getnframes())
     return np.frombuffer(raw, dtype=np.int16).astype(np.float64) / 32768.0
+
+
+def attack_ms(x, centre_s, window_s=REFINE_WINDOW_S):
+    """How fast did the level get to its peak, in milliseconds.
+
+    Returns None when it cannot be measured. Callers treat that as "not sure",
+    and not sure means stay quiet.
+    """
+    n = max(1, int(SR * FINE_MS / 1000))
+    lo = max(0, int((centre_s - window_s) * SR))
+    hi = min(x.size, int((centre_s + window_s) * SR))
+    seg = x[lo:hi]
+    if seg.size < n * 4:
+        return None
+    frames = seg[: (seg.size // n) * n].reshape(-1, n)
+    db = 20 * np.log10(np.sqrt((frames ** 2).mean(axis=1)) + 1e-9)
+    peak = int(np.argmax(db))
+    if peak == 0:
+        return None
+    floor = db[peak] - ATTACK_RANGE_DB
+    i = peak
+    while i > 0 and db[i] > floor:
+        i -= 1
+    if db[i] > floor:            # never got that far below; cannot tell
+        return None
+    return (peak - i) * FINE_MS
 
 
 def analyse(media, start, end):
@@ -67,14 +117,28 @@ def analyse(media, start, end):
             else:
                 onsets.append({"t": round(t, 2), "rise_db": round(rise, 1)})
 
+    # Now measure the shape of each, and keep only the transients.
+    for o in onsets:
+        a = attack_ms(x, o["t"] - start)
+        o["attack_ms"] = a
+        o["transient"] = (a is not None and a <= ATTACK_MAX_MS)
+
+    # Only hits are counted as events. A swell is the music getting louder,
+    # which is not something that happened -- describing it would tell the
+    # viewer about the score rather than about the film.
+    hits = [o for o in onsets if o["transient"]]
+    swells = len(onsets) - len(hits)
+
     level = float(np.median(db))
     spread = float(db.max() - np.median(db))
     if level < -50:
         character = "silent"
-    elif not onsets and spread < 8:
+    elif hits:
+        character = f"{len(hits)} distinct sound event(s)"
+    elif swells:
+        character = "music rising, but nothing arrives"
+    elif spread < 8:
         character = "continuous (music or ambience, no distinct events)"
-    elif onsets:
-        character = f"{len(onsets)} distinct sound event(s)"
     else:
         character = "continuous with some variation"
 
@@ -83,11 +147,19 @@ def analyse(media, start, end):
             "character": character}
 
 
-def loudest(onsets, n):
-    """The n sharpest onsets, in time order. Checking whether a sound has a
-    visible cause costs a model call, so the budget goes to the sounds a viewer
-    is most likely to have noticed."""
-    top = sorted(onsets, key=lambda o: -o["rise_db"])[:n]
+def worth_checking(onsets, n):
+    """The n sharpest *hits*, in time order.
+
+    Two filters, in order. First shape: a swell is the music rising, and music
+    rising is not an event — only something that arrived fast is worth asking
+    the picture about. Second confidence: an onset whose attack could not be
+    measured is not promoted on the strength of its size. Tie goes to silence.
+
+    Then size, because checking costs a model call and the budget should go to
+    the hits a viewer is most likely to have noticed.
+    """
+    hits = [o for o in onsets if o.get("transient")]
+    top = sorted(hits, key=lambda o: -o["rise_db"])[:n]
     return sorted(top, key=lambda o: o["t"])
 
 
@@ -117,12 +189,16 @@ def describe_for_prompt(info, dialogue="", checked=None):
         bits.append(
             f"Audible event(s) at {times} WITH a visible cause — the viewer has "
             f"already worked those out. Not worth spending words on.")
-    if not checked and info["onsets"]:
+    if not checked and any(o.get("transient") for o in info["onsets"]):
         bits.append("Audible events occurred but were not checked against the "
                     "picture.")
-    if not info["onsets"]:
-        bits.append("No distinct audible events — anything that changed on screen "
-                    "here was silent, and the viewer has no other way to know it.")
+    if not any(o.get("transient") for o in info["onsets"]):
+        swelled = bool(info["onsets"])
+        bits.append(
+            ("The music rises here but nothing arrives — a swell is not an event. "
+             if swelled else "No distinct audible events. ") +
+            "Anything that changed on screen was silent, and the viewer has no "
+            "other way to know it.")
 
     if dialogue.strip():
         bits.append(f'Dialogue spoken: "{dialogue}" — do not repeat it.')
