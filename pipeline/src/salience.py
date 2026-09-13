@@ -439,7 +439,7 @@ this has to fit between lines of dialogue. Present tense. Plain."""
 
 
 def describe_film_change(before_png, after_png, max_words, dialogue="",
-                         backend="anthropic", audio_note=""):
+                         backend="anthropic", audio_note="", effort=None):
     from pydantic import BaseModel, Field
 
     class FilmCue(BaseModel):
@@ -472,6 +472,8 @@ def describe_film_change(before_png, after_png, max_words, dialogue="",
         messages=[{"role": "user", "content": content}],
         output_format=FilmCue,
     )
+    if effort:
+        kwargs["output_config"] = {"effort": effort}
     if backend.startswith("bedrock"):
         kwargs["model"] = BEDROCK_MODEL
         client = _client("legacy" if backend.endswith("legacy") else "mantle")

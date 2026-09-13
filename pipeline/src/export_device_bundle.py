@@ -11,7 +11,7 @@ The ranking is fixed here, once, and the device never reorders it. Playback
 speed changes how far down the list the app gets; it must never change which
 story gets told.
 """
-import argparse, json, os, shutil, subprocess, sys
+import argparse, json, os, shutil, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from salience import rank_changes, rank_film_cues, describe_at_budget
 from speech import synthesize, budget_words
@@ -36,6 +36,70 @@ def fragment(src, dst):
                     target], check=True)
     if same:
         os.replace(target, dst)
+
+
+def video_size(path):
+    out = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+         "stream=width,height", "-of", "csv=p=0:s=x", path],
+        capture_output=True, text=True).stdout.strip()
+    try:
+        w, h = out.split("x")[:2]
+        return int(w), int(h)
+    except Exception:
+        return 1920, 1080
+
+
+def picture_rect(path, w, h, samples=(0.25, 0.45, 0.65, 0.85)):
+    """Where the actual picture is, as fractions of the frame.
+
+    Stream dimensions are not enough. Cinemascope content is routinely
+    delivered as 1920x1080 with the letterbox BAKED INTO the image — the Sintel
+    trailer carries 12% black top and bottom — so anything drawn in a corner
+    lands on a bar the player knows nothing about.
+
+    ffmpeg's cropdetect missed it here entirely, so this measures row luminance
+    directly. Several frames are sampled and the SMALLEST letterbox wins: a fade
+    or a dark shot would otherwise look like a bar and crop away real picture.
+    """
+    import numpy as np
+    from PIL import Image
+
+    dur = float(subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+         "-of", "csv=p=0", path], capture_output=True, text=True).stdout.strip() or 0)
+    if dur <= 0:
+        return {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
+
+    best_top, best_bottom = None, None
+    with tempfile.TemporaryDirectory() as td:
+        for i, frac in enumerate(samples):
+            png = os.path.join(td, f"s{i}.png")
+            subprocess.run(["ffmpeg", "-y", "-v", "error", "-ss", f"{dur * frac:.2f}",
+                            "-i", path, "-frames:v", "1", png], check=False)
+            if not os.path.exists(png):
+                continue
+            rows = np.asarray(Image.open(png).convert("L"), dtype=float).mean(axis=1)
+            n = len(rows)
+            top = 0
+            while top < n and rows[top] < 12:
+                top += 1
+            bottom = n - 1
+            while bottom > 0 and rows[bottom] < 12:
+                bottom -= 1
+            if top >= bottom:           # wholly dark frame, tells us nothing
+                continue
+            t_frac, b_frac = top / n, (n - 1 - bottom) / n
+            best_top = t_frac if best_top is None else min(best_top, t_frac)
+            best_bottom = b_frac if best_bottom is None else min(best_bottom, b_frac)
+
+    if best_top is None:
+        return {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
+    # Ignore a couple of stray rows; only report a bar worth avoiding.
+    if best_top < 0.02 and best_bottom < 0.02:
+        return {"x": 0.0, "y": 0.0, "w": 1.0, "h": 1.0}
+    return {"x": 0.0, "y": round(best_top, 4), "w": 1.0,
+            "h": round(1.0 - best_top - best_bottom, 4)}
 
 
 def codec_string(path):
@@ -125,9 +189,13 @@ def main():
         print(f"  #{r['rank']} t={src['t_to']:<6} {'[caused]' if r['caused_by_viewer'] else '        '} "
               f"{meta['words']}w/{meta['duration_s']}s  {text}", file=sys.stderr)
 
+    vw, vh = video_size(os.path.join(a.out, media_name))
     timeline = {
         "media": media_name,
         "mimeCodec": mime,
+        "videoWidth": vw,
+        "videoHeight": vh,
+        "pictureRect": picture_rect(os.path.join(a.out, media_name), vw, vh),
         "mode": a.mode,
         "builtForRate": a.rate,
         "gaps": [{"start": g["start"], "end": g["end"]} for g in gaps],

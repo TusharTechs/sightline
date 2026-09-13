@@ -10,7 +10,7 @@
  * timeline prepared host-side. This file is wiring and remote handling.
  */
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {View, Text, StyleSheet} from 'react-native';
+import {View, Text, StyleSheet, Image} from 'react-native';
 import {KeplerVideoSurfaceView} from '@amazon-devices/react-native-w3cmedia';
 import {useTVEventHandler} from '@amazon-devices/react-native-kepler';
 import {MsePlayer} from './media/MsePlayer';
@@ -61,6 +61,18 @@ export const App = () => {
   const [phase, setPhase] = useState<'loading' | 'undescribed' | 'generating' | 'playing'>('loading');
   const [genMessage, setGenMessage] = useState('');
   const genPoll = useRef<number | null>(null);
+  // Control feedback appears briefly and then leaves. During playback the
+  // screen belongs to the film; a permanent status panel is clutter for the
+  // sighted viewer sharing the room and worth nothing to anyone else.
+  const [chip, setChip] = useState('');
+  // Default to the whole frame; narrowed once the timeline says otherwise.
+  const [picture, setPicture] = useState({x: 0, y: 0, w: 1, h: 1});
+  const chipTimer = useRef<number | null>(null);
+  const flashChip = useCallback((text: string) => {
+    setChip(text);
+    if (chipTimer.current) clearTimeout(chipTimer.current);
+    chipTimer.current = setTimeout(() => setChip(''), 2600) as unknown as number;
+  }, []);
 
   const boot = useCallback(async () => {
     if (booted.current) return;
@@ -99,6 +111,9 @@ export const App = () => {
         }),
       );
 
+      if (timeline.pictureRect) {
+        setPicture(timeline.pictureRect);
+      }
       setMode(timeline.mode);
       scheduler.current = new Scheduler(
         timeline,
@@ -178,6 +193,8 @@ export const App = () => {
       await voice.say('hint');
 
       player.play();
+      setPhase('playing');
+      setGenMessage('');
       setStatus('playing');
     } catch (e: any) {
       setStatus(`FAILED: ${e?.message ?? e}`);
@@ -275,6 +292,7 @@ export const App = () => {
           const wasPaused = player.paused;
           wasPaused ? player.play() : player.pause();
           voice.say(wasPaused ? 'playing' : 'paused');
+          flashChip(wasPaused ? 'Playing' : 'Paused');
           break;
         }
         case 'right': {
@@ -285,6 +303,7 @@ export const App = () => {
           setRate(next);
           player.setRate(next);
           voice.say(next === 1 ? 'rate_1' : next === 1.5 ? 'rate_15' : 'rate_2');
+          flashChip(`${next}× speed`);
           break;
         }
         case 'up': {
@@ -295,6 +314,7 @@ export const App = () => {
           setMode(next);
           scheduler.current?.setMode(next);
           voice.say(next === 'fit' ? 'mode_fit' : 'mode_pause');
+          flashChip(next === 'fit' ? 'Fitting the gaps' : 'Pausing to describe');
           break;
         }
         case 'down': {
@@ -310,6 +330,7 @@ export const App = () => {
           // Announce even when moving to the phone — this is the last thing
           // this device says, and silence would be ambiguous.
           voice.say(next === 'tv' ? 'target_tv' : 'target_phone');
+          flashChip(next === 'tv' ? 'Description on this TV' : 'Description on your phone');
           break;
         }
         case 'menu':
@@ -317,7 +338,7 @@ export const App = () => {
           break;
       }
     },
-    [channel, mode, phase, player, rate, startGeneration, target, voice],
+    [channel, flashChip, mode, phase, player, rate, startGeneration, target, voice],
   );
 
   useTVEventHandler(onRemote);
@@ -332,6 +353,8 @@ export const App = () => {
     },
     [channel, player],
   );
+
+  const busy = phase === 'loading' || phase === 'undescribed' || phase === 'generating';
 
   return (
     <View
@@ -349,72 +372,141 @@ export const App = () => {
         onSurfaceViewCreated={onSurfaceViewCreated}
         onSurfaceViewDestroyed={(h: string) => player.detachSurface(h)}
       />
-      <View style={styles.hud}>
-        {/* Playback settings are meaningless until there is something to
-            play with. Advertising "Fit the gaps · 1x" over a video that has no
-            description yet is just noise. */}
-        {phase === 'playing' ? (
-          <>
-            <Text style={styles.badge}>
-              {mode === 'fit' ? 'Fit the gaps' : 'Pause and explain'} · {rate}x
-              {dropped > 0 ? ` · ${dropped} not said` : ''}
-            </Text>
-            <Text style={styles.target}>
-              {target === 'tv' ? '🔊 Description on this TV' : '📱 Description on phone only'}
-            </Text>
-          </>
-        ) : (
-          <Text style={styles.badge}>Sightline</Text>
-        )}
-        <Text style={styles.status}>
-          {phase === 'generating' || phase === 'undescribed'
-            ? status
-            : `${status} · ${elapsed.toFixed(1)}s`}
-        </Text>
-        {phase === 'undescribed' ? (
-          <Text style={styles.callout}>
-            No audio description exists for this video.{'\n'}Press Select to create it.
-          </Text>
-        ) : null}
-        {phase === 'generating' ? (
-          <Text style={styles.callout}>Describing… {genMessage}</Text>
-        ) : null}
-      </View>
+
+      {/* Playing: just the mark, quietly. Everything else is transient. */}
+      {!busy ? (
+        <View
+          style={[
+            styles.brandMini,
+            // Sit inside the picture, not on the letterbox. Percentages,
+            // because the surface fills the screen whatever shape the film is.
+            {top: `${picture.y * 100}%`, left: `${picture.x * 100}%`},
+          ]}>
+          <Image source={require('./assets/mark.png')} style={styles.markMini} />
+        </View>
+      ) : null}
+
+      {/* Before playback there is nothing to watch, so the panel can own the
+          screen and say what is happening. */}
+      {busy ? (
+        <View style={styles.panel}>
+          <View style={styles.panelHead}>
+            <Image source={require('./assets/mark.png')} style={styles.markLarge} />
+            <Text style={styles.wordmark}>Sightline</Text>
+          </View>
+          {phase === 'undescribed' ? (
+            <>
+              <Text style={styles.panelTitle}>
+                No audio description exists for this video.
+              </Text>
+              <Text style={styles.panelSub}>Press Select to create it.</Text>
+            </>
+          ) : phase === 'generating' ? (
+            <>
+              <Text style={styles.panelTitle}>Describing this video…</Text>
+              <Text style={styles.panelSub}>{genMessage || 'Starting'}</Text>
+            </>
+          ) : (
+            <Text style={styles.panelSub}>{status}</Text>
+          )}
+        </View>
+      ) : null}
+
+      {chip ? (
+        <View style={styles.chip}>
+          <Text style={styles.chipText}>{chip}</Text>
+        </View>
+      ) : null}
+
       {caption ? (
-        <View style={styles.captionBar}>
-          <Text style={styles.caption}>{caption}</Text>
+        <View
+          style={[
+            styles.captionWrap,
+            // Keep captions off the bar too — text on the letterbox reads as a
+            // subtitle burned into the film rather than as the app speaking.
+            {bottom: `${(1 - (picture.y + picture.h)) * 100}%`},
+          ]}>
+          <View style={styles.captionBar}>
+            <View style={styles.captionAccent} />
+            <Text style={styles.caption}>{caption}</Text>
+          </View>
         </View>
       ) : null}
     </View>
   );
 };
 
+// TV layout. Everything is inset from the edges for overscan, text is large
+// enough to read across a room, and contrast is carried by an opaque backing
+// rather than by colour — the caption sits over arbitrary footage.
+const SAFE = 64;
+const ACCENT = '#3ddc97';
+
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#000'},
   surface: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
-  hud: {
+
+  brandMini: {position: 'absolute', opacity: 0.55, margin: 26},
+  markMini: {width: 34, height: 34, resizeMode: 'contain'},
+
+  panel: {
     position: 'absolute',
-    top: 28,
-    left: 40,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(8,12,18,0.72)',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    top: SAFE,
+    left: SAFE,
+    maxWidth: 900,
+    backgroundColor: 'rgba(8,12,18,0.86)',
+    borderRadius: 18,
+    paddingVertical: 26,
+    paddingHorizontal: 32,
   },
-  badge: {color: '#fff', fontSize: 20, fontWeight: '600'},
-  status: {color: '#b6c2d2', fontSize: 15, marginTop: 2},
-  target: {color: '#3ddc97', fontSize: 17, marginTop: 6, fontWeight: '600'},
-  callout: {color: '#fff', fontSize: 24, marginTop: 14, lineHeight: 32},
+  panelHead: {flexDirection: 'row', alignItems: 'center', marginBottom: 16},
+  markLarge: {width: 40, height: 40, resizeMode: 'contain', marginRight: 12},
+  wordmark: {color: '#fff', fontSize: 26, fontWeight: '700', letterSpacing: -0.4},
+  panelTitle: {color: '#fff', fontSize: 34, fontWeight: '600', lineHeight: 44},
+  panelSub: {color: '#9fb0c2', fontSize: 22, marginTop: 8, lineHeight: 30},
+
+  chip: {
+    position: 'absolute',
+    top: SAFE - 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(8,12,18,0.9)',
+    borderRadius: 999,
+    paddingVertical: 12,
+    paddingHorizontal: 26,
+    borderWidth: 1,
+    borderColor: 'rgba(61,220,151,0.45)',
+  },
+  chipText: {color: '#fff', fontSize: 21, fontWeight: '600', letterSpacing: 0.2},
+
+  captionWrap: {
+    position: 'absolute',
+    left: SAFE,
+    right: SAFE,
+    alignItems: 'center',
+    marginBottom: 34,
+  },
   captionBar: {
-    position: 'absolute',
-    left: 60,
-    right: 60,
-    bottom: 54,
-    backgroundColor: 'rgba(8,12,18,0.82)',
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 22,
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: 1400,
+    backgroundColor: 'rgba(6,9,13,0.88)',
+    borderRadius: 16,
+    paddingVertical: 22,
+    paddingHorizontal: 30,
   },
-  caption: {color: '#fff', fontSize: 26, textAlign: 'center'},
+  captionAccent: {
+    width: 4,
+    alignSelf: 'stretch',
+    borderRadius: 2,
+    backgroundColor: ACCENT,
+    marginRight: 22,
+  },
+  caption: {
+    flexShrink: 1,
+    color: '#f4f7fa',
+    fontSize: 34,
+    lineHeight: 46,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
 });
