@@ -100,9 +100,19 @@
   const say = (msg) => { announce.textContent = ''; setTimeout(() => announce.textContent = msg, 40); };
 
   async function fetchBuffer(cue) {
-    const res = await fetch(cue.pcm.replace(/\.pcm$/, '.wav'));
-    const buf = await res.arrayBuffer();
-    buffers.set(cue.rank, await ctx.decodeAudioData(buf));
+    // Static hosting serves mp3 (a twenty-fifth of the bytes); the local
+    // service wraps the device's PCM as wav on the way out. Try the small one
+    // first so a tester on mobile data is not made to wait for either.
+    const base = cue.pcm.replace(/\.pcm$/, '');
+    for (const ext of ['.mp3', '.wav']) {
+      try {
+        const res = await fetch(base + ext);
+        if (!res.ok) continue;
+        const buf = await res.arrayBuffer();
+        buffers.set(cue.rank, await ctx.decodeAudioData(buf));
+        return;
+      } catch {}
+    }
   }
 
   function play(cue) {
@@ -243,7 +253,7 @@
       // Announce immediately — a blind user should not wait on the audio
       // fetch to know the answer arrived.
       say(a.answer);
-      const buf = await (await fetch(a.audio)).arrayBuffer();
+      const buf = await (await fetch(a.audio)).arrayBuffer();   // answers stay wav; they are generated live
       const decoded = await ctx.decodeAudioData(buf);
       const src = ctx.createBufferSource();
       src.buffer = decoded;
