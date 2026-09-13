@@ -31,13 +31,19 @@ batch job months earlier, you can interrupt it and ask a question.
 
 ![Sightline describing a film on Fire TV](docs/screens/sightline.gif)
 
-Running on the Fire TV app: the film plays, and description lands between the
-lines. Nothing on screen but the mark, until there is something to say.
+Running on the Fire TV app. Every word was written by the system from what
+changed on screen, placed where nobody is speaking, and measured to fit before
+it was spoken.
+
+![A wide desert shot with a tiny figure, captioned "Tiny figure crossing vast dunes"](docs/screens/describing.png)
+
+*Nothing in that frame is in the dialogue or the soundtrack. The figure is a few
+pixels across, and it is the shot.*
 
 | | |
 |---|---|
-| ![](docs/screens/describing.png) | ![](docs/screens/playing.png) |
-| A generated description, spoken and captioned | Quiet during playback — the screen belongs to the film |
+| ![Close-up with no caption, only a small mark in the corner](docs/screens/playing.png) | ![Title card captioned "Title card: a tree within a circle. Sintel."](docs/screens/titlecard.png) |
+| Quiet during playback — the screen belongs to the film | Titles are described, but rank last: at speed they are the first thing dropped |
 
 ---
 
