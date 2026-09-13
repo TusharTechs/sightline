@@ -1,0 +1,107 @@
+{
+  "ready": {
+    "pcm": "ui-ready.pcm",
+    "text": "Sightline ready.",
+    "duration": 1.004
+  },
+  "hint": {
+    "pcm": "ui-hint.pcm",
+    "text": "Press Menu at any time to hear the controls.",
+    "duration": 2.401
+  },
+  "playing": {
+    "pcm": "ui-playing.pcm",
+    "text": "Playing.",
+    "duration": 0.49
+  },
+  "paused": {
+    "pcm": "ui-paused.pcm",
+    "text": "Paused.",
+    "duration": 0.536
+  },
+  "rate_1": {
+    "pcm": "ui-rate_1.pcm",
+    "text": "Normal speed.",
+    "duration": 0.942
+  },
+  "rate_15": {
+    "pcm": "ui-rate_15.pcm",
+    "text": "One and a half times speed.",
+    "duration": 1.444
+  },
+  "rate_2": {
+    "pcm": "ui-rate_2.pcm",
+    "text": "Double speed.",
+    "duration": 0.822
+  },
+  "mode_fit": {
+    "pcm": "ui-mode_fit.pcm",
+    "text": "Fitting descriptions into gaps.",
+    "duration": 1.692
+  },
+  "mode_pause": {
+    "pcm": "ui-mode_pause.pcm",
+    "text": "Pausing to describe.",
+    "duration": 1.153
+  },
+  "target_tv": {
+    "pcm": "ui-target_tv.pcm",
+    "text": "Description on this television.",
+    "duration": 1.601
+  },
+  "target_phone": {
+    "pcm": "ui-target_phone.pcm",
+    "text": "Description on your phone only.",
+    "duration": 1.567
+  },
+  "ended": {
+    "pcm": "ui-ended.pcm",
+    "text": "Finished.",
+    "duration": 0.462
+  },
+  "undescribed": {
+    "pcm": "ui-undescribed.pcm",
+    "text": "This video has no audio description. Press Select to create one.",
+    "duration": 4.4
+  },
+  "gen_listening": {
+    "pcm": "ui-gen_listening.pcm",
+    "text": "Listening for dialogue.",
+    "duration": 1.226
+  },
+  "gen_watching": {
+    "pcm": "ui-gen_watching.pcm",
+    "text": "Watching what changes.",
+    "duration": 1.187
+  },
+  "gen_ranking": {
+    "pcm": "ui-gen_ranking.pcm",
+    "text": "Ranking what matters most.",
+    "duration": 1.434
+  },
+  "gen_voicing": {
+    "pcm": "ui-gen_voicing.pcm",
+    "text": "Preparing the voice.",
+    "duration": 1.084
+  },
+  "gen_ready": {
+    "pcm": "ui-gen_ready.pcm",
+    "text": "Description ready. Starting.",
+    "duration": 1.898
+  },
+  "gen_failed": {
+    "pcm": "ui-gen_failed.pcm",
+    "text": "Could not describe this video.",
+    "duration": 1.492
+  },
+  "error": {
+    "pcm": "ui-error.pcm",
+    "text": "Something went wrong. Check the companion service.",
+    "duration": 2.959
+  },
+  "help": {
+    "pcm": "ui-help.pcm",
+    "text": "Select plays or pauses. Right changes speed. Up switches between fitting descriptions into gaps and pausing to describe. Down moves description to your phone. Menu repeats this.",
+    "duration": 12.753
+  }
+}
