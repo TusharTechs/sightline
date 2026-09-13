@@ -37,6 +37,15 @@ PHRASES = {
     "target_tv":      "Description on this television.",
     "target_phone":   "Description on your phone only.",
     "ended":          "Finished.",
+    # Generation. Spoken as each stage begins — a progress bar is no use to
+    # someone who cannot see it, and half a minute of silence reads as a hang.
+    "undescribed":    "This video has no audio description. Press Select to create one.",
+    "gen_listening":  "Listening for dialogue.",
+    "gen_watching":   "Watching what changes.",
+    "gen_ranking":    "Ranking what matters most.",
+    "gen_voicing":    "Preparing the voice.",
+    "gen_ready":      "Description ready. Starting.",
+    "gen_failed":     "Could not describe this video.",
     "error":          "Something went wrong. Check the companion service.",
     # Spoken on demand, and once at startup, because a blind user has no way to
     # discover the controls otherwise.

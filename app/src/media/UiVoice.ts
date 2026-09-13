@@ -21,7 +21,9 @@ export type Phrase =
   | 'rate_1' | 'rate_15' | 'rate_2'
   | 'mode_fit' | 'mode_pause'
   | 'target_tv' | 'target_phone'
-  | 'ended' | 'error' | 'help';
+  | 'ended' | 'error' | 'help'
+  | 'undescribed' | 'gen_listening' | 'gen_watching' | 'gen_ranking'
+  | 'gen_voicing' | 'gen_ready' | 'gen_failed';
 
 interface Entry {
   pcm: string;

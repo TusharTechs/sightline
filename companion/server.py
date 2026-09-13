@@ -30,6 +30,90 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = {"t": 0.0, "rate": 1.0, "mode": "solo", "playing": False, "updated": 0.0}
 LOCK = threading.Lock()
 
+# Generation progress, so the app can say what is happening rather than showing
+# a spinner to someone who cannot see it.
+GEN = {"running": False, "stage": "idle", "message": "", "done": 0, "total": 0,
+       "ready": False, "error": None}
+GEN_LOCK = threading.Lock()
+PIPELINE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "pipeline")
+PY_BIN = os.path.join(PIPELINE, ".venv", "bin", "python")
+
+
+def _gen(**kw):
+    with GEN_LOCK:
+        GEN.update(kw)
+
+
+def _run_stage(args, on_line=None):
+    """Run a pipeline step, surfacing its progress lines as they appear."""
+    proc = subprocess.Popen(args, cwd=PIPELINE, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True, bufsize=1)
+    for line in proc.stdout:
+        line = line.rstrip()
+        if on_line and line:
+            on_line(line)
+    proc.wait()
+    if proc.returncode != 0:
+        raise RuntimeError(f"{os.path.basename(args[1])} failed")
+
+
+def generate(media_name):
+    """Describe a video that has none, start to finish.
+
+    Runs as a background thread and reports progress, because the whole point
+    of showing this is that the work is otherwise invisible — the app plays a
+    file and nothing reveals that the file was written minutes ago by looking
+    at the picture.
+    """
+    try:
+        media = os.path.join(BUNDLE, media_name)
+        out = os.path.join(BUNDLE, "out")
+        os.makedirs(out, exist_ok=True)
+        gaps = os.path.join(out, "gaps.json")
+        cues = os.path.join(out, "cues.json")
+        tcache = os.path.join(out, "transcript.json")
+
+        _gen(running=True, ready=False, error=None, done=0, total=0,
+             stage="listening", message="Listening for dialogue")
+        _run_stage([PY_BIN, "src/detect_speech.py", media,
+                    "--cache", tcache, "--out", gaps])
+
+        with open(gaps) as f:
+            n_gaps = json.load(f)["count"]
+        _gen(stage="watching", total=0,
+             message=f"Found {n_gaps} places to speak. Watching what changes")
+
+        def progress(line):
+            line = line.strip()
+            # Long gaps get subdivided, so the unit of work is segments, not
+            # gaps — taking the total from the gap count reported done past
+            # total.
+            if line.startswith("progress "):
+                done, total = line.split()[1].split("/")
+                with GEN_LOCK:
+                    GEN["done"], GEN["total"] = int(done), int(total)
+                    GEN["message"] = f"Watched {done} of {total} moments"
+            elif "speakable segments" in line:
+                with GEN_LOCK:
+                    GEN["total"] = int(line.split("->")[1].split()[0])
+
+        _run_stage([PY_BIN, "src/film_cues.py", media, gaps,
+                    "--transcript", tcache, "--rate", "1.0", "--out", cues],
+                   progress)
+
+        _gen(stage="ranking", message="Ranking what matters most")
+        _run_stage([PY_BIN, "src/export_device_bundle.py", cues, media,
+                    "--gaps", gaps, "--mode", "fit", "--rate", "1.0",
+                    "--out", BUNDLE])
+
+        _gen(stage="voicing", message="Preparing the voice")
+        _run_stage([PY_BIN, "src/build_ui_voice.py", "--out", BUNDLE])
+
+        _gen(running=False, ready=True, stage="ready", message="Description ready")
+    except Exception as e:
+        _gen(running=False, ready=False, stage="failed", error=str(e)[:200],
+             message="Could not describe this")
+
 
 def wav_header(nbytes, rate=48000, channels=2, bits=16):
     """Phone browsers will not play raw PCM; wrap it on the way out."""
@@ -145,6 +229,24 @@ class Handler(BaseHTTPRequestHandler):
                                     "Access-Control-Allow-Methods": "GET,POST,OPTIONS"})
 
     def do_POST(self):
+        if self.path == "/generate":
+            n = int(self.headers.get("Content-Length", 0))
+            try:
+                data = json.loads(self.rfile.read(n) or b"{}")
+            except Exception:
+                data = {}
+            with GEN_LOCK:
+                if GEN["running"]:
+                    return self._send(409, json.dumps({"error": "already running"}))
+            media = data.get("media", "content.mp4")
+            # Reset synchronously, before the worker starts. The caller polls
+            # immediately, and a stale "ready" from the previous run would send
+            # it straight to playback of a description that no longer exists.
+            _gen(running=True, ready=False, error=None, done=0, total=0,
+                 stage="starting", message="Starting")
+            threading.Thread(target=generate, args=(media,), daemon=True).start()
+            return self._send(202, json.dumps({"started": True, "media": media}))
+
         if self.path == "/ask":
             n = int(self.headers.get("Content-Length", 0))
             try:
@@ -181,6 +283,10 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/phone", "/phone.html"):
             with open(os.path.join(HERE, "phone.html"), "rb") as f:
                 return self._send(200, f.read(), "text/html; charset=utf-8")
+
+        if path == "/generate/status":
+            with GEN_LOCK:
+                return self._send(200, json.dumps(dict(GEN)))
 
         if path == "/state":
             with LOCK:

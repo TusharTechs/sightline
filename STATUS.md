@@ -47,7 +47,21 @@ MIT licence, a README arranged so a judge can verify claims without running
 anything, a mermaid architecture diagram, and the app finally has a name and an
 icon rather than "Basic UI React Native Application for project sightline".
 
-### 3. "Real time" needs to be either true or reworded.
+### 3. ~~"Real time" needs to be either true or reworded.~~ Made visible.
+
+The app now detects that a video has no description, offers to create one, and
+speaks its way through the work: listening for dialogue, watching what changes,
+ranking, preparing the voice. Then it plays.
+
+Generation went from **103 seconds to 29** on a 52-second trailer. Two changes
+did it: describing segments concurrently, and asking for slightly fewer words
+than the budget strictly allows — every overshoot cost a rewrite *and* a
+re-synthesis, which is where the time actually was. The margin also stopped a
+line being dropped for want of a retry, so it was faster and better.
+
+Description is still generated before playback rather than during it. That is
+the design — generate once for content nobody will ever describe by hand — but
+the work is no longer invisible.
 
 Description is generated **ahead of playback** and the app fetches a prebuilt
 bundle. Questions are answered live; the description track is not. That is a
