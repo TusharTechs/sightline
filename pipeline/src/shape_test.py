@@ -16,8 +16,16 @@ So this builds a sorting test instead:
 
   - clips are only cut where no onset of the OPPOSITE class falls inside them,
     so a clip labelled "swell" cannot contain a hit
-  - every clip is loudness-normalised, which removes size. The claim under test
-    is that shape is audible independently of level, so level has to go
+  - clips run well past the onset. The difference between the two classes is
+    what the level does one to two seconds AFTER the peak, so a clip that ends
+    before then has had the answer cut out of it and every clip sounds alike.
+    This is not hypothetical: the first version used a 1.5 s tail, and the
+    decay was unmeasurable in all sixteen
+  - level is matched with a single static gain per clip. Size has to go, because
+    the claim under test is that shape is audible independently of level -- but
+    it has to go without touching shape. A dynamic loudness normaliser is a
+    compressor, and a compressor exists precisely to reshape attacks, so it
+    cannot be used to test whether attacks are audible
   - filenames are random. The answer key is written separately and should not
     be opened until the sorting is done
 
@@ -26,7 +34,7 @@ Usage:
 
 Then sort the clips in DIR into two groups by ear, and only then read key.json.
 """
-import argparse, json, os, random, subprocess, sys, uuid
+import argparse, json, os, random, subprocess, sys, tempfile, uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from audio_events import analyse
@@ -72,13 +80,48 @@ def uncontaminated(onsets, lead, tail, min_gap):
     return picked
 
 
+TARGET_DBFS = -20.0
+HEADROOM_DBFS = -1.0
+
+
+def _levels(path):
+    """Mean and peak level of a file, in dBFS."""
+    out = subprocess.run(
+        ["ffmpeg", "-hide_banner", "-i", path, "-af", "volumedetect",
+         "-f", "null", "-"], capture_output=True, text=True).stderr
+    mean = peak = None
+    for line in out.splitlines():
+        if "mean_volume:" in line:
+            mean = float(line.split("mean_volume:")[1].split("dB")[0])
+        elif "max_volume:" in line:
+            peak = float(line.split("max_volume:")[1].split("dB")[0])
+    return mean, peak
+
+
 def cut(media, t, lead, tail, dest):
-    """One clip, loudness-normalised so that size cannot give the answer away."""
-    subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{t - lead:.3f}",
-         "-t", f"{lead + tail:.3f}", "-i", media, "-vn",
-         "-af", "loudnorm=I=-20:TP=-1.5:LRA=11", "-ac", "2", "-ar", "44100",
-         dest], check=True)
+    """One clip, level-matched by a single static gain.
+
+    The gain is one number applied to the whole clip, so every ratio inside it
+    is preserved exactly: the attack is still the attack and the decay is still
+    the decay. It is also held back far enough to avoid clipping, because
+    clipping flattens peaks and peaks are the thing being judged.
+    """
+    with tempfile.TemporaryDirectory() as td:
+        raw = os.path.join(td, "raw.wav")
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{t - lead:.3f}",
+             "-t", f"{lead + tail:.3f}", "-i", media, "-vn",
+             "-ac", "2", "-ar", "44100", raw], check=True)
+        mean, peak = _levels(raw)
+        gain = 0.0
+        if mean is not None:
+            gain = TARGET_DBFS - mean
+            if peak is not None:
+                gain = min(gain, HEADROOM_DBFS - peak)
+        subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", raw,
+             "-af", f"volume={gain:.2f}dB", "-ac", "2", "-ar", "44100",
+             dest], check=True)
 
 
 def main():
@@ -86,7 +129,7 @@ def main():
     p.add_argument("media")
     p.add_argument("--out", required=True)
     p.add_argument("--lead", type=float, default=2.5)
-    p.add_argument("--tail", type=float, default=1.5)
+    p.add_argument("--tail", type=float, default=3.5)
     p.add_argument("--min-gap", type=float, default=1.0)
     p.add_argument("--max-per-class", type=int, default=12)
     p.add_argument("--seed", type=int, default=None)
