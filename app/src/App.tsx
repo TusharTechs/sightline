@@ -20,7 +20,7 @@ import {UiVoice, Phrase} from './media/UiVoice';
 import {dropTone} from './media/tone';
 import {Cue, Mode, Timeline} from './types';
 
-const HOST = 'http://10.0.2.2:8099';
+const HOST = 'http://10.0.2.2:8190';
 const TIMELINE_URL = `${HOST}/timeline.json`;
 const RATES = [1.0, 1.5, 2.0];
 

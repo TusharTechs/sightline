@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "pipeline", "src"))
 
 BUNDLE = os.environ.get("SIGHTLINE_BUNDLE", "/tmp/sightline-serve")
-PORT = int(os.environ.get("SIGHTLINE_PORT", "8099"))
+PORT = int(os.environ.get("SIGHTLINE_PORT", "8190"))
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 # What the TV last told us. A dict rather than a class because there is exactly
@@ -329,6 +329,29 @@ class Handler(BaseHTTPRequestHandler):
         self._send(404, b'{"error":"not found"}')
 
 
+def _port_already_answering(port):
+    """Is something else already serving here?
+
+    Binding 0.0.0.0 succeeds even when another process holds 127.0.0.1 on the
+    same port, and the more specific bind wins for localhost. The result is two
+    servers, no error, and requests silently reaching the wrong one — which is
+    exactly what happened, and looked like our own service hanging.
+    """
+    import urllib.error, urllib.request
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/state", timeout=1.5).read()
+        return True
+    except urllib.error.HTTPError:
+        return True          # something answered, just not with 200
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
+    if _port_already_answering(PORT):
+        raise SystemExit(
+            f"refusing to start: something is already answering on port {PORT}.\n"
+            f"  check with:  lsof -nP -iTCP:{PORT} -sTCP:LISTEN\n"
+            f"  or choose another:  SIGHTLINE_PORT=8191 ...")
     print(f"companion service on :{PORT}, serving {BUNDLE}")
     ThreadingHTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
