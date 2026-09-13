@@ -17,14 +17,29 @@ Day 7 of 46. **39 effective days** (treat 22 October as the deadline).
 
 ## Not done — in the order I would fix them
 
-### 1. The app is not accessible. *(worst problem we have)*
+### 1. ~~The app is not accessible.~~ Done — the app speaks for itself.
 
-There is no screen-reader support, no audio feedback, and no way to know which
-mode you are in without reading the HUD. A blind person cannot currently operate
-Sightline unaided.
+Sightline now voices its own interface. Every control confirms itself aloud, it
+announces itself on startup, and Menu reads out the controls.
 
-That is a product failure before it is a judging problem, and a judge will find
-it in thirty seconds. Everything else on this list is smaller.
+It deliberately does **not** route this through the platform screen reader.
+VoiceView cannot be enabled on the virtual device at all (FL-011) and may be off
+on real hardware, and an accessibility app that only works when another
+accessibility feature is already switched on is not much use. Phrases are
+pre-rendered PCM shipped with the bundle, so a confirmation never waits on the
+network or a speech engine. React Native accessibility props are set as well,
+for anyone who does have VoiceView running — untestable here, but harmless.
+
+Two details that matter more than they look:
+
+- **Interface speech interrupts description.** The user just pressed a button;
+  telling them it took precedence over finishing a sentence about the film.
+- **Startup speaks before playback starts, not over it.** The full controls list
+  runs nearly thirteen seconds, so startup says a short line pointing at Menu
+  and the long version is on demand. Talking across the opening of the film is
+  the exact mistake this app exists to prevent.
+
+**Still untested:** whether VoiceView works with it on physical hardware.
 
 ### 2. No LICENSE and no README.
 

@@ -15,6 +15,7 @@ import {KeplerVideoSurfaceView} from '@amazon-devices/react-native-w3cmedia';
 import {MsePlayer} from './media/MsePlayer';
 import {DescriptionChannel} from './media/DescriptionChannel';
 import {Scheduler} from './media/Scheduler';
+import {UiVoice} from './media/UiVoice';
 import {dropTone} from './media/tone';
 import {Cue, Mode, Timeline} from './types';
 
@@ -38,6 +39,7 @@ export const App = () => {
   const player = useRef(new MsePlayer()).current;
   const channel = useRef(new DescriptionChannel()).current;
   const scheduler = useRef<Scheduler | null>(null);
+  const voice = useRef<UiVoice>(new UiVoice(HOST, channel)).current;
   const pcm = useRef<Map<number, ArrayBuffer>>(new Map()).current;
   const tone = useRef<ArrayBuffer | null>(null);
   const surfaceReady = useRef(false);
@@ -64,6 +66,8 @@ export const App = () => {
       setStatus('preparing audio');
       await channel.initialize();
       tone.current = dropTone();
+      // Load the interface voice before anything else that might need to speak.
+      await voice.load();
 
       // Descriptions are fetched up front. They are small, and a description
       // that arrives late is worse than one that never arrives.
@@ -139,16 +143,27 @@ export const App = () => {
         }).catch(() => {});
       }, 300) as unknown as number;
       player.on('playing', () => setStatus('playing'));
-      player.on('ended', () => setStatus('ended'));
+      player.on('ended', () => {
+        setStatus('ended');
+        voice.say('ended');
+      });
 
       setStatus('loading media');
       await player.load(`${HOST}/${timeline.media}`, timeline.mimeCodec);
+
+      // Speak BEFORE starting playback, not over it. A blind user cannot
+      // discover the controls any other way, but the full list runs twelve
+      // seconds — so point at it here and let them ask for it.
+      await voice.say('ready');
+      await voice.say('hint');
+
       player.play();
       setStatus('playing');
     } catch (e: any) {
       setStatus(`FAILED: ${e?.message ?? e}`);
+      voice.say('error');
     }
-  }, [channel, pcm, player]);
+  }, [channel, pcm, player, voice]);
 
   const onSurfaceViewCreated = useCallback(
     (handle: string) => {
@@ -164,19 +179,24 @@ export const App = () => {
     const handler = (evt: HWEvent) => {
       switch (evt?.eventType) {
         case 'playPause':
-        case 'select':
-          player.paused ? player.play() : player.pause();
+        case 'select': {
+          const wasPaused = player.paused;
+          wasPaused ? player.play() : player.pause();
+          voice.say(wasPaused ? 'playing' : 'paused');
           break;
+        }
         case 'right': {
           const next = RATES[(RATES.indexOf(rate) + 1) % RATES.length];
           setRate(next);
           player.setRate(next);
+          voice.say(next === 1 ? 'rate_1' : next === 1.5 ? 'rate_15' : 'rate_2');
           break;
         }
         case 'up': {
           const next: Mode = mode === 'fit' ? 'pause' : 'fit';
           setMode(next);
           scheduler.current?.setMode(next);
+          voice.say(next === 'fit' ? 'mode_fit' : 'mode_pause');
           break;
         }
         case 'down': {
@@ -185,16 +205,19 @@ export const App = () => {
           setTarget(next);
           // Cut any line already in progress — switching to the phone must
           // silence this device immediately, not at the end of a sentence.
-          if (next === 'phone') {
-            channel.cancel();
-          }
+          // Announce on the television even when moving to the phone — this is
+          // the last thing this device says, and silence would be ambiguous.
+          voice.say(next === 'tv' ? 'target_tv' : 'target_phone');
           break;
         }
+        case 'menu':
+          voice.say('help');
+          break;
       }
     };
     const sub = TVEventHandler.addListener?.(handler);
     return () => sub?.remove?.();
-  }, [channel, mode, player, rate, target]);
+  }, [channel, mode, player, rate, target, voice]);
 
   useEffect(
     () => () => {
@@ -207,7 +230,16 @@ export const App = () => {
   );
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      accessible
+      accessibilityRole="none"
+      accessibilityLabel={
+        `Sightline. ${status}. ` +
+        `${mode === 'fit' ? 'Fitting descriptions into gaps' : 'Pausing to describe'}. ` +
+        `${rate} times speed. ` +
+        `${target === 'tv' ? 'Description on this television' : 'Description on your phone'}.`
+      }>
       <KeplerVideoSurfaceView
         style={styles.surface}
         onSurfaceViewCreated={onSurfaceViewCreated}
