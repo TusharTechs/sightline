@@ -14,9 +14,9 @@ it. The word budget comes from the gap, at the playback rate, exactly as before.
 import argparse, json, os, subprocess, sys, tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from salience import describe_film_change
+from salience import describe_film_change, onset_has_visible_cause
 from speech import budget_words, synthesize
-from audio_events import analyse, describe_for_prompt
+from audio_events import analyse, describe_for_prompt, loudest
 
 FRAME_WIDTH = 1280     # 800px was slower AND lost detail; measured, not assumed
 # A long gap gets described more than once. Sixteen seconds of silence in a film
@@ -27,6 +27,9 @@ MIN_SEGMENT_S = 1.2
 # Segments are described concurrently. Sequentially this took over 90 seconds
 # for a 52-second trailer, which is too slow to ever show anyone.
 WORKERS = 16
+# Checking whether a sound has a visible cause costs a model call, so only the
+# sharpest few per segment are examined.
+ONSET_CHECKS = 2
 # Ask for fewer words than the budget strictly allows. The budget is computed
 # from a measured average speaking rate, but any individual line can come out
 # slower — and every overshoot costs a rewrite AND a re-synthesis, which is
@@ -34,6 +37,16 @@ WORKERS = 16
 # correcting afterwards, and it stops lines being dropped for want of a retry.
 FIRST_ASK = 0.85
 SHRINK_ATTEMPTS = 4
+
+
+def _near_black(png, threshold=14):
+    """Is there effectively nothing on screen? Title cards, fades, cuts to black."""
+    try:
+        import numpy as np
+        from PIL import Image
+        return float(np.asarray(Image.open(png).convert("L"), dtype=float).mean()) < threshold
+    except Exception:
+        return False
 
 
 def subdivide(gaps, max_len=MAX_SEGMENT_S, min_len=MIN_SEGMENT_S):
@@ -110,7 +123,28 @@ def main():
         grab(a.media, g["start"], after)
         spoken = dialogue_between(None, items, anchor, g["start"]) if items else ""
         audio = analyse(a.media, anchor, g["start"])
-        note = describe_for_prompt(audio, spoken)
+
+        # Which of those sounds explained themselves? A noise with nothing on
+        # screen to account for it is the single most useful thing to describe;
+        # a noise with a visible cause is the least.
+        checked = []
+        for o in loudest(audio["onsets"], ONSET_CHECKS):
+            ob = os.path.join(td, f"o{i}_{o['t']}_b.png")
+            oa = os.path.join(td, f"o{i}_{o['t']}_a.png")
+            try:
+                grab(a.media, max(0.0, o["t"] - 0.18), ob)
+                grab(a.media, o["t"] + 0.18, oa)
+                # A near-black frame makes "nothing visible accounts for it"
+                # trivially true and useless — over a title card or a fade it is
+                # the score, not an event anyone is wondering about. The rule is
+                # for a bang with nothing attached, not for music.
+                if _near_black(ob) and _near_black(oa):
+                    continue
+                v = onset_has_visible_cause(ob, oa, a.backend)
+                checked.append({"t": o["t"], **v})
+            except Exception:
+                pass
+        note = describe_for_prompt(audio, spoken, checked)
 
         ask = max(a.min_words, int(budget * FIRST_ASK))
         v = describe_film_change(before, after, ask, spoken, a.backend, note, a.effort)
@@ -137,7 +171,10 @@ def main():
             "t": g["start"], "gap": g, "word_budget": budget,
             "changed": v["changed"], "description": text,
             "speech_s": meta["duration_s"] if meta else None,
-            "audio": {"character": audio["character"], "onsets": audio["onsets"]},
+            "audio": {"character": audio["character"], "onsets": audio["onsets"],
+                      "checked": checked,
+                      "unexplained": [c["t"] for c in checked
+                                      if not c["visible_cause"]]},
         }, f"[say ] gap {g['start']:>6}-{g['end']:<6} {text[:52]}"
 
     # Pass 1, concurrent. Each segment is described against the START OF THE

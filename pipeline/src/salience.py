@@ -421,8 +421,15 @@ need it said back to them. Spend the words on what makes no sound:
 - a look or gesture that changes what the next line means
 - something visible that contradicts what is being said
 
+NEVER NAME WHAT YOU CANNOT SEE.
+If a sound had no visible source, say that something happened out of shot and
+stop there. "Something crashes off screen" is right. Naming what fell is a
+guess, and one wrong guess costs the viewer their trust in everything else you
+say.
+
 WHAT NOT TO SAY:
-- anything the soundtrack already delivered (see the audio evidence below)
+- anything the soundtrack already explained on its own — a door, footsteps,
+  someone crying. Those sounds account for themselves and the viewer has them.
 - anything the dialogue already said
 - anything that describes the FILMING rather than the film. The test is not
   whether it is camera vocabulary, it is whether the viewer can use it. "She is
@@ -493,8 +500,16 @@ time for all of them.
 Rank them by how much the viewer needs each one to follow what is happening.
 Rank 1 is the one they most need.
 
-Most needed: who someone is, where the story has moved to, what someone did
-that changes the situation, something revealed or lost.
+Most needed, in this order:
+1. A sound with nothing visible to account for it. The viewer heard something
+   and cannot work out what — it will nag at them through the next minute of
+   the film. Only description can resolve it.
+2. A change that made no sound at all. Invisible to them by every other route.
+3. A change that made a sound with a visible cause. They have already worked
+   that out; it is the first thing to cut.
+
+Then: who someone is, where the story has moved to, what someone did that
+changes the situation, something revealed or lost.
 
 Least needed: titles, logos, credits and end cards. A viewer who misses those
 misses nothing about the story — they are the first thing to cut, not the last.
@@ -543,3 +558,71 @@ def rank_film_cues(cues, backend="anthropic"):
     for r in out:
         r["caused_by_viewer"] = False      # never applicable in film
     return out
+
+
+# ---------------------------------------------------------------------------
+# Does a sound explain itself?
+#
+# The rule, sharpened by the ADP list reviewer after a first pass got it wrong:
+#
+#   "It isn't sound present, skip it. It's sound that EXPLAINS ITSELF, skip it.
+#    Sound that doesn't explain itself goes near the top... A bang with nothing
+#    attached to it isn't information, it's a question, and I'll sit on that
+#    question for the next minute of the film instead of following the story."
+#
+# So the ranking is three-tier, not two:
+#
+#   1. a noise with no visible cause   — highest; only description can resolve it
+#   2. a silent change                 — invisible, but nothing is nagging at them
+#   3. a noise with a visible cause    — lowest; they have worked it out already
+#
+# And a hard constraint on the writing: NEVER name what made an unseen sound.
+#   "Get that wrong once and I stop trusting the whole track. 'Something crashes
+#    off screen' tells me what I need without naming what fell."
+# ---------------------------------------------------------------------------
+
+ONSET_PROMPT = """Two frames from a film, a fraction of a second apart. Something
+audible happened between them — a sharp rise in the soundtrack.
+
+Does anything visible in these frames account for that sound?
+
+Answer yes only if you can see the thing that made it, or see it happening: an
+impact, a door, someone striking something, a vehicle, a fall. Movement alone is
+not an explanation, and neither is a plausible guess about what is off screen.
+
+If nothing visible accounts for it, say so. Do NOT speculate about what made it."""
+
+
+def onset_has_visible_cause(before_png, after_png, backend="anthropic"):
+    """Was there anything on screen to account for a sound?"""
+    from pydantic import BaseModel, Field
+
+    class Verdict(BaseModel):
+        visible_cause: bool = Field(
+            description="is the source of the sound visible in these frames")
+        what: str = Field(
+            description="the visible cause in a few words, or empty if none")
+
+    content = [
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                     "data": _b64(before_png)}},
+        {"type": "image", "source": {"type": "base64", "media_type": "image/png",
+                                     "data": _b64(after_png)}},
+        {"type": "text", "text": ONSET_PROMPT},
+    ]
+    kwargs = dict(
+        max_tokens=4000,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user", "content": content}],
+        output_format=Verdict,
+    )
+    if backend.startswith("bedrock"):
+        kwargs["model"] = BEDROCK_MODEL
+        client = _client("legacy" if backend.endswith("legacy") else "mantle")
+    else:
+        import anthropic
+        if "anthropic" not in _clients:
+            _clients["anthropic"] = anthropic.Anthropic()
+        client = _clients["anthropic"]
+        kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+    return client.messages.parse(**kwargs).parsed_output.model_dump()
