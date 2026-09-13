@@ -319,13 +319,22 @@ export const App = () => {
         onSurfaceViewDestroyed={(h: string) => player.detachSurface(h)}
       />
       <View style={styles.hud}>
-        <Text style={styles.badge}>
-          {mode === 'fit' ? 'Fit the gaps' : 'Pause and explain'} · {rate}x
-          {dropped > 0 ? ` · ${dropped} not said` : ''}
-        </Text>
-        <Text style={styles.target}>
-          {target === 'tv' ? '🔊 Description on this TV' : '📱 Description on phone only'}
-        </Text>
+        {/* Playback settings are meaningless until there is something to
+            play with. Advertising "Fit the gaps · 1x" over a video that has no
+            description yet is just noise. */}
+        {phase === 'playing' ? (
+          <>
+            <Text style={styles.badge}>
+              {mode === 'fit' ? 'Fit the gaps' : 'Pause and explain'} · {rate}x
+              {dropped > 0 ? ` · ${dropped} not said` : ''}
+            </Text>
+            <Text style={styles.target}>
+              {target === 'tv' ? '🔊 Description on this TV' : '📱 Description on phone only'}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.badge}>Sightline</Text>
+        )}
         <Text style={styles.status}>
           {phase === 'generating' || phase === 'undescribed'
             ? status
