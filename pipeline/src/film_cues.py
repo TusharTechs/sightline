@@ -12,6 +12,7 @@ ask what has changed since the last thing we said, and whether the viewer needs
 it. The word budget comes from the gap, at the playback rate, exactly as before.
 """
 import argparse, json, os, subprocess, sys, tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from salience import describe_film_change
 from speech import budget_words, synthesize
@@ -23,6 +24,16 @@ FRAME_WIDTH = 1280      # 1080p costs tokens for no benefit here
 # description speaks periodically rather than once per pause.
 MAX_SEGMENT_S = 6.0
 MIN_SEGMENT_S = 1.2
+# Segments are described concurrently. Sequentially this took over 90 seconds
+# for a 52-second trailer, which is too slow to ever show anyone.
+WORKERS = 8
+# Ask for fewer words than the budget strictly allows. The budget is computed
+# from a measured average speaking rate, but any individual line can come out
+# slower — and every overshoot costs a rewrite AND a re-synthesis, which is
+# where the time actually went. Undershooting slightly is far cheaper than
+# correcting afterwards, and it stops lines being dropped for want of a retry.
+FIRST_ASK = 0.85
+SHRINK_ATTEMPTS = 4
 
 
 def subdivide(gaps, max_len=MAX_SEGMENT_S, min_len=MIN_SEGMENT_S):
@@ -84,54 +95,81 @@ def main():
         items = json.load(open(a.transcript))["results"]["items"]
 
     td = tempfile.mkdtemp()
-    cues, anchor = [], 0.0
-    for i, g in enumerate(gaps[: a.max_cues]):
+    segments = gaps[: a.max_cues]
+
+    def build(i, g, anchor):
+        """Describe one segment. Returns a cue, or None if nothing to say."""
         budget = budget_words(g["len_s"], a.rate)
         if budget < a.min_words:
-            print(f"  gap {g['start']}-{g['end']} -> {budget}w, too short", file=sys.stderr)
-            continue
+            return None, f"gap {g['start']}-{g['end']} -> {budget}w, too short"
 
         before = os.path.join(td, f"b{i}.png")
         after = os.path.join(td, f"a{i}.png")
         grab(a.media, anchor, before)
         grab(a.media, g["start"], after)
         spoken = dialogue_between(None, items, anchor, g["start"]) if items else ""
-        # What did the viewer already hear? A change that made a noise is
-        # already delivered; the gap should go to something silent.
         audio = analyse(a.media, anchor, g["start"])
         note = describe_for_prompt(audio, spoken)
 
-        v = describe_film_change(before, after, budget, spoken, a.backend, note)
-        mark = "say " if v["worth_saying"] else "skip"
-        print(f"  [{mark}] gap {g['start']:>6}-{g['end']:<6} {budget:>2}w  "
-              f"{v['changed'][:58]}", file=sys.stderr)
+        ask = max(a.min_words, int(budget * FIRST_ASK))
+        v = describe_film_change(before, after, ask, spoken, a.backend, note)
         if not (v["worth_saying"] and v["description"].strip()):
-            continue
+            return None, f"[skip] gap {g['start']:>6}-{g['end']:<6} {v['changed'][:52]}"
 
-        # The budget is an estimate; the rendered duration decides. Shrink until
-        # it genuinely fits rather than trusting the word count.
+        # Budget is an estimate; the rendered duration decides.
         avail = g["len_s"] / a.rate
         text, meta = v["description"], None
-        for shrink in range(3):
-            meta = synthesize(text, os.path.join(td, f"p{i}.pcm"))
+        for shrink in range(SHRINK_ATTEMPTS):
+            meta = synthesize(text, os.path.join(td, f"p{i}-{shrink}.pcm"))
             if meta["duration_s"] <= avail:
                 break
-            want = max(a.min_words, budget - (shrink + 1) * 2)
-            print(f"          {meta['duration_s']}s > {avail:.2f}s, "
-                  f"rewriting to {want}w", file=sys.stderr)
+            # Scale by how far over we actually are rather than stepping down a
+            # fixed amount, so a badly overrunning line converges immediately.
+            over = meta["duration_s"] / avail
+            want = max(a.min_words, int(len(text.split()) / over) - 1)
             text = describe_film_change(before, after, want, spoken,
                                         a.backend, note)["description"]
         if meta and meta["duration_s"] > avail:
-            print(f"          dropped — will not fit {avail:.2f}s", file=sys.stderr)
-            continue
+            return None, f"[drop] gap {g['start']} will not fit {avail:.2f}s"
 
-        cues.append({
+        return {
             "t": g["start"], "gap": g, "word_budget": budget,
             "changed": v["changed"], "description": text,
             "speech_s": meta["duration_s"] if meta else None,
             "audio": {"character": audio["character"], "onsets": audio["onsets"]},
-        })
-        anchor = g["start"]
+        }, f"[say ] gap {g['start']:>6}-{g['end']:<6} {text[:52]}"
+
+    # Pass 1, concurrent. Each segment is described against the START OF THE
+    # PREVIOUS SEGMENT rather than the previous thing actually said, which makes
+    # them independent and therefore parallelisable.
+    guesses = [0.0] + [g["start"] for g in segments[:-1]]
+    results = [None] * len(segments)
+    with ThreadPoolExecutor(max_workers=WORKERS) as pool:
+        futures = {pool.submit(build, i, g, guesses[i]): i
+                   for i, g in enumerate(segments)}
+        # Report as each finishes rather than in a batch at the end. Callers
+        # show this to someone waiting, and a silent minute reads as a hang.
+        for n, fut in enumerate(as_completed(futures), 1):
+            results[futures[fut]] = fut.result()
+            print(f"  progress {n}/{len(segments)}", file=sys.stderr, flush=True)
+
+    # Pass 2, sequential and usually tiny. Where a segment was skipped, the next
+    # one's real anchor is further back than we guessed, and it may have missed
+    # what changed during the skipped stretch. Only those get redone.
+    cues, log, last_said = [], [], 0.0
+    for i, (cue, msg) in enumerate(results):
+        expected = guesses[i]
+        if cue is not None and abs(expected - last_said) > 0.01:
+            cue, msg = build(i, segments[i], last_said)
+            msg = (msg or "") + "   (redone: anchor moved back)"
+        log.append(msg)
+        if cue is not None:
+            cues.append(cue)
+            last_said = cue["t"]
+
+    for m in log:
+        if m:
+            print(f"  {m}", file=sys.stderr)
 
     json.dump({"media": a.media, "rate": a.rate, "count": len(cues), "cues": cues},
               open(a.out, "w"), indent=2)

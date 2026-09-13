@@ -15,7 +15,7 @@ import {KeplerVideoSurfaceView} from '@amazon-devices/react-native-w3cmedia';
 import {MsePlayer} from './media/MsePlayer';
 import {DescriptionChannel} from './media/DescriptionChannel';
 import {Scheduler} from './media/Scheduler';
-import {UiVoice} from './media/UiVoice';
+import {UiVoice, Phrase} from './media/UiVoice';
 import {dropTone} from './media/tone';
 import {Cue, Mode, Timeline} from './types';
 
@@ -55,13 +55,32 @@ export const App = () => {
   const [target, setTarget] = useState<AudioTarget>('tv');
   const targetRef = useRef<AudioTarget>('tv');
   const [elapsed, setElapsed] = useState(0);
+  // 'undescribed' is the state that makes the work visible: the content is
+  // there, nothing has described it, and the user can set that going.
+  const [phase, setPhase] = useState<'loading' | 'undescribed' | 'generating' | 'playing'>('loading');
+  const [genMessage, setGenMessage] = useState('');
+  const genPoll = useRef<number | null>(null);
 
   const boot = useCallback(async () => {
     if (booted.current) return;
     booted.current = true;
     try {
       setStatus('loading timeline');
-      const timeline: Timeline = await (await fetch(TIMELINE_URL)).json();
+      let timeline: Timeline | null = null;
+      try {
+        const res = await fetch(TIMELINE_URL);
+        timeline = res.ok ? await res.json() : null;
+      } catch {
+        timeline = null;
+      }
+      if (!timeline) {
+        // Nothing has described this. Offer to, rather than failing.
+        setPhase('undescribed');
+        setStatus('no description for this video');
+        await voice.load();
+        await voice.say('undescribed');
+        return;
+      }
 
       setStatus('preparing audio');
       await channel.initialize();
@@ -165,6 +184,52 @@ export const App = () => {
     }
   }, [channel, pcm, player, voice]);
 
+  const startGeneration = useCallback(async () => {
+    setPhase('generating');
+    let spoken = '';
+    try {
+      await fetch(`${HOST}/generate`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({media: 'content.mp4'}),
+      });
+    } catch {
+      voice.say('gen_failed');
+      setPhase('undescribed');
+      return;
+    }
+    if (genPoll.current) clearInterval(genPoll.current);
+    genPoll.current = setInterval(async () => {
+      let g: any;
+      try {
+        g = await (await fetch(`${HOST}/generate/status`)).json();
+      } catch {
+        return;
+      }
+      setGenMessage(g.message || '');
+      // Speak each stage once as it begins. Not the counts — "watched seven of
+      // nine" said every few seconds would be worse than silence.
+      const phrase: Record<string, Phrase> = {
+        listening: 'gen_listening', watching: 'gen_watching',
+        ranking: 'gen_ranking', voicing: 'gen_voicing',
+      };
+      if (g.stage !== spoken && phrase[g.stage]) {
+        spoken = g.stage;
+        voice.say(phrase[g.stage]);
+      }
+      if (g.ready) {
+        if (genPoll.current) clearInterval(genPoll.current);
+        await voice.say('gen_ready');
+        booted.current = false;
+        boot();
+      } else if (g.stage === 'failed') {
+        if (genPoll.current) clearInterval(genPoll.current);
+        voice.say('gen_failed');
+        setPhase('undescribed');
+      }
+    }, 1200) as unknown as number;
+  }, [boot, voice]);
+
   const onSurfaceViewCreated = useCallback(
     (handle: string) => {
       player.attachSurface(handle);
@@ -180,6 +245,13 @@ export const App = () => {
       switch (evt?.eventType) {
         case 'playPause':
         case 'select': {
+          if (phase === 'undescribed') {
+            startGeneration();
+            break;
+          }
+          if (phase === 'generating') {
+            break;   // nothing useful to do; don't let a press look like a hang
+          }
           const wasPaused = player.paused;
           wasPaused ? player.play() : player.pause();
           voice.say(wasPaused ? 'playing' : 'paused');
@@ -217,12 +289,13 @@ export const App = () => {
     };
     const sub = TVEventHandler.addListener?.(handler);
     return () => sub?.remove?.();
-  }, [channel, mode, player, rate, target, voice]);
+  }, [channel, mode, phase, player, rate, startGeneration, target, voice]);
 
   useEffect(
     () => () => {
       if (poll.current) clearInterval(poll.current);
       if (report.current) clearInterval(report.current);
+      if (genPoll.current) clearInterval(genPoll.current);
       channel.destroy();
       player.destroy();
     },
@@ -254,8 +327,18 @@ export const App = () => {
           {target === 'tv' ? '🔊 Description on this TV' : '📱 Description on phone only'}
         </Text>
         <Text style={styles.status}>
-          {status} · {elapsed.toFixed(1)}s
+          {phase === 'generating' || phase === 'undescribed'
+            ? status
+            : `${status} · ${elapsed.toFixed(1)}s`}
         </Text>
+        {phase === 'undescribed' ? (
+          <Text style={styles.callout}>
+            No audio description exists for this video.{'\n'}Press Select to create it.
+          </Text>
+        ) : null}
+        {phase === 'generating' ? (
+          <Text style={styles.callout}>Describing… {genMessage}</Text>
+        ) : null}
       </View>
       {caption ? (
         <View style={styles.captionBar}>
@@ -282,6 +365,7 @@ const styles = StyleSheet.create({
   badge: {color: '#fff', fontSize: 20, fontWeight: '600'},
   status: {color: '#b6c2d2', fontSize: 15, marginTop: 2},
   target: {color: '#3ddc97', fontSize: 17, marginTop: 6, fontWeight: '600'},
+  callout: {color: '#fff', fontSize: 24, marginTop: 14, lineHeight: 32},
   captionBar: {
     position: 'absolute',
     left: 60,
