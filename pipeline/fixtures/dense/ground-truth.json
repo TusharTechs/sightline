@@ -1,0 +1,23 @@
+{
+  "name": "account-setup-dense",
+  "duration": 24.0,
+  "note": "Deliberately dense: fifteen state changes in twenty-four seconds, under near-continuous narration. Built so that MORE things happen than there is room to say, which is the only condition under which the drop tone fires.",
+  "events": [
+    {"t":1.5,"what":"data policy checkbox ticked","salient":true},
+    {"t":3.0,"what":"recovery email field becomes enabled","salient":true},
+    {"t":4.5,"what":"data region set to Europe","salient":true},
+    {"t":6.0,"what":"validation error: email incomplete","salient":true},
+    {"t":7.5,"what":"error clears, email accepted","salient":true},
+    {"t":9.0,"what":"Continue button becomes enabled","salient":true},
+    {"t":10.5,"what":"progress bar begins filling","salient":false},
+    {"t":12.0,"what":"advances to step 2 of 4","salient":true},
+    {"t":13.5,"what":"advanced options panel appears","salient":true},
+    {"t":15.0,"what":"automatic backups enabled","salient":true},
+    {"t":16.5,"what":"warning about backup size","salient":true},
+    {"t":18.0,"what":"advances to step 3 of 4","salient":true},
+    {"t":19.5,"what":"confirmation dialog opens","salient":true},
+    {"t":21.0,"what":"dialog closes, setup complete","salient":true},
+    {"t":22.5,"what":"Continue becomes Finish","salient":true}
+  ],
+  "counts": {"salient": 14, "decoration": 1}
+}

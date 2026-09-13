@@ -1,0 +1,10 @@
+{
+  "note": "A trainer talking almost continuously, as training videos do. Leaves only short gaps — which is the point.",
+  "segments": [
+    {"t":0.0,"text":"Let's set up your account. First, accept the data policy to continue."},
+    {"t":5.2,"text":"Now add a recovery email and choose where your data is stored."},
+    {"t":10.2,"text":"Once that's valid you can continue to the next step."},
+    {"t":14.4,"text":"Turn on automatic backups here, and review the advanced options."},
+    {"t":19.8,"text":"Confirm, and your account is ready to use."}
+  ]
+}

@@ -1,0 +1,98 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Account setup — dense walkthrough</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;width:1280px;height:720px;background:#eef1f5;
+       font:16px/1.45 -apple-system,"Segoe UI",system-ui,sans-serif;color:#1b2430}
+  .app{position:absolute;inset:36px;background:#fff;border-radius:10px;
+       box-shadow:0 8px 30px rgba(20,30,50,.13);overflow:hidden}
+  header{padding:18px 26px;border-bottom:1px solid #e2e7ee;display:flex;
+         align-items:center;justify-content:space-between}
+  h1{font-size:20px;margin:0;font-weight:600}
+  .step{color:#7b8798;font-size:15px}
+  .bar{height:4px;background:#e7ecf2}
+  .bar i{display:block;height:100%;background:#2f6fed;transition:none}
+  .body{padding:22px 26px;height:470px;position:relative}
+  .row{display:flex;align-items:center;gap:13px;padding:13px 0;border-bottom:1px solid #f0f3f7}
+  .box{width:21px;height:21px;border:2px solid #93a1b5;border-radius:5px;flex:none;
+       display:flex;align-items:center;justify-content:center}
+  .box.on{background:#2f6fed;border-color:#2f6fed}
+  .box.on::after{content:"✓";color:#fff;font-size:14px;font-weight:700}
+  .label{flex:1}
+  .sub{color:#7b8798;font-size:14px}
+  input,select{padding:8px 11px;border:1px solid #b9c3d1;border-radius:6px;font-size:15px;min-width:190px}
+  input:disabled,select:disabled{background:#f1f4f8;color:#a9b3c1;border-color:#dde3ea}
+  input.bad{border-color:#d64545;background:#fff5f5}
+  .msg{margin-top:14px;padding:11px 15px;border-radius:7px;font-size:15px}
+  .msg.err{background:#fdecec;color:#a32020;border:1px solid #f3c2c2}
+  .msg.warn{background:#fff6e5;color:#8a5a00;border:1px solid #f0d9a8}
+  .msg.ok{background:#e9f7ef;color:#1f6f43;border:1px solid #bfe3cd}
+  .panel{margin-top:16px;padding:15px;border:1px solid #e2e7ee;border-radius:8px;background:#fafbfd}
+  footer{position:absolute;left:0;right:0;bottom:0;padding:15px 26px;border-top:1px solid #e2e7ee;
+         display:flex;justify-content:flex-end;gap:11px;background:#fff}
+  button{padding:10px 20px;border-radius:7px;border:1px solid #2f6fed;background:#2f6fed;
+         color:#fff;font-size:15px;font-weight:600}
+  button:disabled{background:#e8ecf2;border-color:#e8ecf2;color:#a9b3c1}
+  .overlay{position:absolute;inset:0;background:rgba(18,25,38,.45)}
+  .modal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:420px;
+         background:#fff;border-radius:10px;box-shadow:0 20px 60px rgba(10,16,28,.35);padding:24px}
+</style>
+<div id="root"></div>
+<script>
+// Deliberately dense: fifteen state changes in twenty-four seconds. State is a
+// pure function of t, so the ground truth below is exact.
+function state(t){return{
+  consent:  t>=1.5,
+  emailOn:  t>=3.0,
+  emailBad: t>=6.0 && t<7.5,
+  emailOk:  t>=7.5,
+  region:   t>=4.5,
+  nextOn:   t>=9.0,
+  progress: t>=10.5 ? Math.min(1,(t-10.5)/11) : 0,
+  step:     t>=18 ? 3 : t>=12 ? 2 : 1,
+  panel:    t>=13.5,
+  backup:   t>=15.0,
+  warn:     t>=16.5 && t<19.5,
+  modal:    t>=19.5 && t<21.0,
+  done:     t>=21.0,
+}}
+function render(t){
+  const s=state(t);
+  document.getElementById('root').innerHTML=`
+  <div class="app">
+    <header><h1>Account setup</h1><span class="step">Step ${s.step} of 4</span></header>
+    <div class="bar"><i style="width:${Math.round(s.progress*100)}%"></i></div>
+    <div class="body">
+      <div class="row"><div class="box ${s.consent?'on':''}"></div>
+        <div class="label"><div>Accept the data policy</div>
+        <div class="sub">Required before continuing</div></div></div>
+      <div class="row"><div class="box" style="border:none"></div>
+        <div class="label"><div class="${s.emailOn?'':'sub'}">Recovery email</div>
+        <div class="sub">Used if you lose access</div></div>
+        <input class="${s.emailBad?'bad':''}" ${s.emailOn?'':'disabled'}
+          value="${s.emailOn?(s.emailBad?'name@':'name@example.com'):''}"></div>
+      <div class="row"><div class="box" style="border:none"></div>
+        <div class="label"><div>Data region</div><div class="sub">Where your data is stored</div></div>
+        <select><option>${s.region?'Europe':'Select…'}</option></select></div>
+      ${s.backup?`<div class="row"><div class="box on"></div>
+        <div class="label"><div>Enable automatic backups</div>
+        <div class="sub">Nightly, retained 30 days</div></div></div>`:''}
+      ${s.emailBad?`<div class="msg err">That email address is incomplete.</div>`:''}
+      ${s.warn?`<div class="msg warn">Backups will use about 4 GB a month.</div>`:''}
+      ${s.done?`<div class="msg ok">Setup complete. Your account is ready.</div>`:''}
+      ${s.panel&&!s.done?`<div class="panel"><b>Advanced options</b>
+        <div class="sub">Encryption, retention and export settings</div></div>`:''}
+    </div>
+    <footer><button class="ghost" style="background:#fff;color:#41506a;border-color:#c4cddb">Back</button>
+      <button ${s.nextOn?'':'disabled'}>${s.done?'Finish':'Continue'}</button></footer>
+    ${s.modal?`<div class="overlay"></div><div class="modal">
+      <h2 style="margin:0 0 9px;font-size:18px">Apply these settings?</h2>
+      <p style="margin:0 0 18px;color:#5c6879">Backups and region cannot be changed later.</p>
+      <div style="display:flex;justify-content:flex-end;gap:9px">
+        <button style="background:#fff;color:#41506a;border-color:#c4cddb">Cancel</button>
+        <button>Apply</button></div></div>`:''}
+  </div>`;
+}
+render(parseFloat(new URLSearchParams(location.search).get('t')||'0'));
+</script>

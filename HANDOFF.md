@@ -323,6 +323,19 @@ Two rules fall out of it:
 Note that `AudioPlaybackStream.duckVolumeAsync()` does not help here — it ducks
 *our* stream when something higher priority arrives, not the film.
 
+**The drop tone fires on speed, not on density.** Worth recording because it was
+not obvious. The exporter already sizes every line to its gap, so at the rate a
+bundle was built for nothing is ever dropped. But the scheduler measures gaps in
+wall-clock time — `gap_length / rate` — so raising the speed shrinks every gap
+and lines that previously fitted stop fitting. On the Sintel bundle: 0 dropped at
+1x, 4 at 1.5x, 5 at 2x.
+
+That is the right behaviour and a better demonstration than denser content would
+have been, because the trade happens as a direct consequence of the viewer's own
+choice to speed up — which is exactly the situation the tone was designed for:
+*"At 2x I already know I'm trading detail for speed. I'm not owed everything.
+I'm owed knowing what I traded."*
+
 **Evaluate by task, not by taste.** Also from the same source, and it is the
 test protocol *and* the demo structure: *"Don't ask us whether the description is
 good. Ask us to do the task. Play the walkthrough and ask what we'd click next.
