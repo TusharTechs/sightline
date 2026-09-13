@@ -18,7 +18,7 @@ from salience import describe_film_change
 from speech import budget_words, synthesize
 from audio_events import analyse, describe_for_prompt
 
-FRAME_WIDTH = 1280      # 1080p costs tokens for no benefit here
+FRAME_WIDTH = 1280     # 800px was slower AND lost detail; measured, not assumed
 # A long gap gets described more than once. Sixteen seconds of silence in a film
 # where things are visibly happening is not restraint, it is a hole — real
 # description speaks periodically rather than once per pause.
@@ -26,7 +26,7 @@ MAX_SEGMENT_S = 6.0
 MIN_SEGMENT_S = 1.2
 # Segments are described concurrently. Sequentially this took over 90 seconds
 # for a 52-second trailer, which is too slow to ever show anyone.
-WORKERS = 8
+WORKERS = 16
 # Ask for fewer words than the budget strictly allows. The budget is computed
 # from a measured average speaking rate, but any individual line can come out
 # slower — and every overshoot costs a rewrite AND a re-synthesis, which is
@@ -83,6 +83,7 @@ def main():
     p.add_argument("--backend", default="anthropic")
     p.add_argument("--min-words", type=int, default=3)
     p.add_argument("--max-cues", type=int, default=12)
+    p.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"])
     p.add_argument("--out", required=True)
     a = p.parse_args()
 
@@ -112,7 +113,7 @@ def main():
         note = describe_for_prompt(audio, spoken)
 
         ask = max(a.min_words, int(budget * FIRST_ASK))
-        v = describe_film_change(before, after, ask, spoken, a.backend, note)
+        v = describe_film_change(before, after, ask, spoken, a.backend, note, a.effort)
         if not (v["worth_saying"] and v["description"].strip()):
             return None, f"[skip] gap {g['start']:>6}-{g['end']:<6} {v['changed'][:52]}"
 
@@ -128,7 +129,7 @@ def main():
             over = meta["duration_s"] / avail
             want = max(a.min_words, int(len(text.split()) / over) - 1)
             text = describe_film_change(before, after, want, spoken,
-                                        a.backend, note)["description"]
+                                        a.backend, note, a.effort)["description"]
         if meta and meta["duration_s"] > avail:
             return None, f"[drop] gap {g['start']} will not fit {avail:.2f}s"
 

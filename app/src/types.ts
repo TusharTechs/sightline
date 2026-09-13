@@ -20,6 +20,10 @@ export interface Timeline {
   /** Fragmented MP4 the cues belong to. */
   media: string;
   mimeCodec: string;
+  /** Where the picture actually is, as fractions of the frame. Cinemascope
+   *  content carries its letterbox inside the image, so a corner overlay lands
+   *  on a black bar unless this is honoured. */
+  pictureRect?: {x: number; y: number; w: number; h: number};
   mode: Mode;
   /** Silences available for description, in media time. Only used in fit mode. */
   gaps: {start: number; end: number}[];

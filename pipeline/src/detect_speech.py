@@ -77,7 +77,7 @@ def transcribe(media, cache=None):
         status = st["TranscriptionJobStatus"]
         if status in ("COMPLETED", "FAILED"):
             break
-        time.sleep(5)
+        time.sleep(1.5)
     if status == "FAILED":
         sys.exit(f"transcription failed: {st.get('FailureReason')}")
 
