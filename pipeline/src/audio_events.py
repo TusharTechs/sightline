@@ -16,6 +16,25 @@ is enough to answer "was this change accompanied by a noise, or was it silent?"
 Method: short-time RMS, then onsets where energy jumps sharply above the recent
 local level. Music that swells gradually does not produce onsets; impacts,
 footfalls and slams do.
+
+KNOWN WEAKNESS, and it is the one worth knowing about. This answers "did
+something arrive" one sound at a time. It has nothing to say about a passage
+where five things arrive together, and a listener in that passage is not
+asking which sound to name -- they are asking what the scene just became.
+That is a different question and none of this addresses it.
+
+The suspicion was that the rule might also go quietest exactly where the most
+is happening, since a suppressed event costs more in a busy stretch. Measured
+across the full film, it does not: the proportion of onsets claimed as events
+RISES with density, 61% in windows holding one or two onsets against 73% in
+windows holding eight or more, and windows that end up claiming nothing are
+sparser than average (2.5 onsets against 3.3 film-wide). The floor moves the
+other way too -- dense windows sit lower, not higher.
+
+One case does deserve the worry. A window at 360 s holds four onsets with
+attacks of 30, 40, 70 and 110 ms and claims none of them. Fast arrivals going
+unclaimed together is the failure this would show up as, and it is recorded
+here rather than averaged away.
 """
 import argparse, json, os, subprocess, sys, tempfile
 import numpy as np
