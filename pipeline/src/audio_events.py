@@ -87,6 +87,20 @@ TAIL_LONG_S = 2.0         # "still sitting there two seconds later"
 # the music changing rather than an event.
 BACK_HOME_DB = 3.0        # within this of the pre-onset floor -> it went away
 STAYED_UP_DB = 3.0        # still this far above the old floor -> it stayed
+# A verdict sitting right on a boundary must not be the one that makes us
+# speak. Same reviewer, on which way instability should break:
+#
+#   "A wrong label is a description that's a bit off. A missed onset is
+#    silence, and silence is the one thing I can't tell apart from nothing
+#    having happened... If the borderline case turns into an announcement,
+#    that's the one that sends me hunting for something that was never there.
+#    If it turns into quiet, I'm no worse off than I already was."
+#
+# So "hit" -- the only verdict that can produce a claim -- has to clear its
+# condition by this margin. Inside the margin the answer is not sure, and not
+# sure is silence. Swell and unsure both end in silence already and need no
+# such protection: the asymmetry is the point.
+EDGE_DB = 1.5
 # Extra audio loaded past the window so the tail of a late onset is measurable.
 TAIL_PAD_S = TAIL_LONG_S + TAIL_WINDOW_S
 
@@ -189,9 +203,11 @@ def shape_of(x, centre_s, floor_db):
         return a, None, None, False
 
     above_1s, above_2s = settle(x, peak_s, floor_db)
-    # Came home, at either checkpoint. It took whatever time it took.
-    if (above_1s is not None and above_1s <= BACK_HOME_DB) or \
-       (above_2s is not None and above_2s <= BACK_HOME_DB):
+    # Came home, at either checkpoint, and came home clearly. It took whatever
+    # time it took, but a value sitting on the line does not get to speak.
+    home = BACK_HOME_DB - EDGE_DB
+    if (above_1s is not None and above_1s <= home) or \
+       (above_2s is not None and above_2s <= home):
         return a, above_1s, above_2s, True
     # Two seconds on and still well above where it started: it stayed.
     if above_2s is not None and above_2s > STAYED_UP_DB:

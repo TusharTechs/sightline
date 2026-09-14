@@ -20,9 +20,21 @@ all of them by the same amount should cancel. A lossy re-encode is not exactly
 invariant -- it genuinely alters the waveform -- but it is inaudible, so
 anything it flips was not being decided by what the sound is.
 
-Two numbers come out. Label flips say how stable the rule is. Evidence changes
-say how much of that instability reaches the description, which is the only
-place it can do any harm.
+Three numbers come out. Label flips say how stable the rule is. Evidence
+changes say how much of that instability reaches the description, which is the
+only place it can do harm. And direction says which way it breaks, which
+matters more than the count:
+
+    "A wrong label is a description that's a bit off. A missed onset is
+     silence, and silence is the one thing I can't tell apart from nothing
+     having happened... If the borderline case turns into an announcement,
+     that's the one that sends me hunting for something that was never there.
+     If it turns into quiet, I'm no worse off than I already was. I'd take that
+     trade every time."
+
+So a change that makes the system say less is counted as safe, and one that
+makes it announce something it was not going to announce is counted as costly.
+They are not the same failure and they should never be added together.
 
 Usage:
     stability.py MEDIA --gaps gaps.json
@@ -80,6 +92,11 @@ def scan(media, duration, step=6.0):
     return out
 
 
+def says_event(info):
+    """Would this window produce a claim that something audible happened?"""
+    return any(o["transient"] for o in info["onsets"])
+
+
 def compare(a, b):
     """Match onsets by time, then count what moved."""
     flips, gone, extra, matched = [], 0, 0, 0
@@ -132,20 +149,40 @@ def main():
             if len(flips) > 6:
                 print(f"      ... and {len(flips)-6} more")
 
+        # Which way does it break? Measured over the whole film on the scan
+        # grid, so the sample is every window rather than a handful of gaps.
+        print("\n  direction, over every window in the film")
+        print(f"  {'perturbation':<26} {'->quiet':>9} {'->announce':>12}")
+        for name, path in variants:
+            to_quiet = to_announce = 0
+            t = 0.0
+            while t < dur:
+                w = (t, min(t + a.step, dur))
+                was = says_event(analyse(base, *w))
+                now = says_event(analyse(path, *w))
+                if was and not now:
+                    to_quiet += 1
+                elif now and not was:
+                    to_announce += 1
+                t += a.step
+            print(f"  {name:<26} {to_quiet:>9} {to_announce:>12}")
+
         if a.gaps:
-            print("\n  does any of it reach the description?")
+            print("\n  and in the real gaps")
             gaps = json.load(open(a.gaps))
             gaps = gaps.get("gaps", gaps) if isinstance(gaps, dict) else gaps
-            changed = 0
             for g in gaps:
                 s, e = g["start"], g["end"]
-                want = describe_for_prompt(analyse(base, s, e))
+                ref = analyse(base, s, e)
+                want = describe_for_prompt(ref)
                 for name, path in variants:
-                    if describe_for_prompt(analyse(path, s, e)) != want:
-                        changed += 1
-                        print(f"      gap {s}-{e}s differs under {name}")
-                        break
-            print(f"      {changed} of {len(gaps)} gaps change their evidence line")
+                    got = analyse(path, s, e)
+                    if describe_for_prompt(got) != want:
+                        was, now = says_event(ref), says_event(got)
+                        way = ("-> ANNOUNCE (costly)" if now and not was
+                               else "-> quiet (safe)" if was and not now
+                               else "wording only, same conclusion")
+                        print(f"      gap {s}-{e}s under {name}: {way}")
 
 
 if __name__ == "__main__":
