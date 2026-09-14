@@ -36,6 +36,9 @@ PAGE = """<title>Can you hear what the machine hears?</title>
   legend {{ font-weight:bold; padding:0 .4rem; }}
   audio {{ width:100%; margin:.25rem 0 .75rem; }}
   .choices {{ display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; }}
+  .ask {{ margin:.25rem 0 .5rem; }}
+  textarea {{ width:100%; font:inherit; padding:.5rem; border:1px solid var(--line);
+    border-radius:5px; background:var(--bg); color:var(--fg); box-sizing:border-box; }}
   label {{ display:flex; align-items:center; gap:.45rem; cursor:pointer; }}
   button {{ font:inherit; background:var(--acc); color:var(--bg); border:0;
     border-radius:5px; padding:.7rem 1.4rem; cursor:pointer; }}
@@ -50,8 +53,9 @@ PAGE = """<title>Can you hear what the machine hears?</title>
 <main>
   <h1>Can you hear what the machine hears?</h1>
   <p class="sub">{n} clips, six seconds each. Most of them my code calls either
-  an event or the music. A few it could not call at all. Can you tell which is
-  which?</p>
+  an event or the music, and for those the question is which. A few it could
+  not call at all, and for those the question is different: what would you
+  want said?</p>
 
   <div class="task">
     <p><strong>The task.</strong> Play each clip and decide: did
@@ -88,11 +92,16 @@ const form = document.getElementById('quiz');
 const out = document.getElementById('out');
 form.addEventListener('submit', e => {{
   e.preventDefault();
-  const said = KEY.map((_, i) => {{
+  const said = KEY.map((k, i) => {{
+    if (k === 'unsure') {{
+      const t = form.querySelector(`textarea[name="q${{i+1}}"]`);
+      return t ? t.value.trim() : '';
+    }}
     const c = form.querySelector(`input[name="q${{i+1}}"]:checked`);
     return c ? c.value : null;
   }});
-  const missing = said.map((v,i)=>v?null:i+1).filter(Boolean);
+  // Probes may be left blank. "Nothing" is a real answer to what should be said.
+  const missing = said.map((v,i)=>(KEY[i]==='unsure'||v)?null:i+1).filter(Boolean);
   if (missing.length) {{
     out.innerHTML = `<p class="res">Still unanswered: clip ${{missing.join(', ')}}.
       "I could not tell" counts as an answer.</p>`;
@@ -142,8 +151,13 @@ form.addEventListener('submit', e => {{
         listener does.</p>`;
     }})()}}
     ${{probes.length ? `<p>${{probes.length}} of the clips were ones my own code
-       could not call either. They are not scored. You said
-       ${{probes.map(i=>nice(said[i])).join(', ')}} to those.</p>` : ''}}
+       could not call. They are not scored, and they were not the same
+       question. What you would want said there:</p>
+       <ul>${{probes.map(i=>`<li>Clip ${{i+1}}: ${{said[i]
+          ? said[i].replace(/[<>&]/g, c=>({{'<':'&lt;','>':'&gt;','&':'&amp;'}}[c]))
+          : '<em>nothing</em>'}}</li>`).join('')}}</ul>
+       <p>Those answers are the most useful thing on this page and they are
+       also the part I cannot score. Copy them to me if you are willing.</p>` : ''}}
     <table><caption class="sub">Clip by clip</caption>
       <tr><th>Clip</th><th>You said</th><th>Code said</th><th></th></tr>
       ${{rows}}</table>
@@ -155,6 +169,16 @@ form.addEventListener('submit', e => {{
 }});
 </script>
 """
+
+PROBE = """    <fieldset class="clip">
+      <legend>Clip {n} of {total}</legend>
+      <audio controls preload="none" src="clips/{f}">Your browser cannot play audio.</audio>
+      <p class="ask"><label for="t{n}">My code could not call this one. So
+      rather than asking which it is: <strong>what would you want said here,
+      if anything?</strong></label></p>
+      <textarea id="t{n}" name="q{n}" rows="3"
+        placeholder="Nothing, if nothing is what you would want."></textarea>
+    </fieldset>"""
 
 ITEM = """    <fieldset class="clip">
       <legend>Clip {n} of {total}</legend>
@@ -181,7 +205,8 @@ def main():
     for i, k in enumerate(key, 1):
         name = f"clip-{i:02d}.mp3"
         shutil.copy(os.path.join(a.test_dir, k["file"]), os.path.join(clips, name))
-        items.append(ITEM.format(n=i, total=len(key), f=name))
+        tmpl = PROBE if k["answer"] == "unsure" else ITEM
+        items.append(tmpl.format(n=i, total=len(key), f=name))
         answers.append(k["answer"])
 
     enc = base64.b64encode(json.dumps(answers).encode()).decode()

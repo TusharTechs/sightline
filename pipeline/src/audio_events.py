@@ -100,7 +100,15 @@ STAYED_UP_DB = 3.0        # still this far above the old floor -> it stayed
 # condition by this margin. Inside the margin the answer is not sure, and not
 # sure is silence. Swell and unsure both end in silence already and need no
 # such protection: the asymmetry is the point.
-EDGE_DB = 1.5
+#
+# The width is not chosen. It is the measured noise floor of this pipeline:
+# run the same film three ways and see how far the settle values move. Uniform
+# gain moves them 0.00 dB, exactly, at every onset -- the rule really is
+# differences-only. A lossy re-encode moves them a median of 0.00, a 99th
+# percentile of 0.16, and a maximum of 1.60. So the margin is 1.6 dB, which is
+# wider than anything the pipeline's own instability can produce and no wider.
+# Recompute it with stability.py --margin if the chain ever changes.
+EDGE_DB = 1.6
 # Extra audio loaded past the window so the tail of a late onset is measurable.
 TAIL_PAD_S = TAIL_LONG_S + TAIL_WINDOW_S
 
