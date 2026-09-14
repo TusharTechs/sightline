@@ -74,9 +74,16 @@
   </div>
 </section>
 
-<div class="said" aria-live="off">
-  <h2>Described so far</h2>
-  <ul id="log"></ul>
+<!-- Append-only, and deliberately so. This list was written newest-first,
+     which meant every new description shifted every existing entry down. A
+     screen reader whose cursor was sitting on one of those entries had it
+     moved out from under it, and played its "nothing here" tone -- once per
+     description, which is what a listener reported as a repeating donk. role
+     is log, which is append-only by definition, and updates are not announced
+     because the line is being spoken aloud at the same moment anyway. -->
+<div class="said">
+  <h2 id="saidHead">Described so far</h2>
+  <ul id="log" role="log" aria-live="off" aria-labelledby="saidHead"></ul>
 </div>
 
 <div class="sr" aria-live="assertive" id="announce"></div>
@@ -190,9 +197,16 @@
     // on it.
     if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
     duckFilm(cue.duration || 4);
+    // Append, never prepend: adding at the end leaves every existing entry
+    // where it was, so a reader's cursor stays valid. Plain text nodes rather
+    // than innerHTML, for the same reason -- less for the reader to re-walk.
     const li = document.createElement('li');
-    li.innerHTML = `<span class="t">${cue.t.toFixed(1)}s</span><br>${cue.text}`;
-    log.prepend(li);
+    const stamp = document.createElement('span');
+    stamp.className = 't';
+    stamp.textContent = `${cue.t.toFixed(1)}s`;
+    li.append(stamp, document.createElement('br'),
+              document.createTextNode(cue.text));
+    log.append(li);
     return true;
   }
 
