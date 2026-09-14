@@ -101,7 +101,19 @@
   let running = false, lastState = null, tickTimer = null;
   let lastAge = null;
 
-  const say = (msg) => { announce.textContent = ''; setTimeout(() => announce.textContent = msg, 40); };
+  // Never write an empty string here. Clearing a live region before writing
+  // to it is a common trick for forcing a re-announcement, and it is why a
+  // listener heard VoiceOver's empty-element tone over and over instead of
+  // speech: an assertive region that changes to nothing is still a change,
+  // and nothing is what gets announced. To repeat an identical message,
+  // toggle an invisible character instead.
+  let lastSaid = '';
+  const say = (msg) => {
+    if (!msg) return;
+    const out = (msg === lastSaid) ? msg + '\u200B' : msg;
+    lastSaid = out;
+    announce.textContent = out;
+  };
 
   // Writing the same string into a live region is still a mutation, and a
   // screen reader reads it again. tick() runs four times a second, so an
@@ -128,7 +140,12 @@
 
   function play(cue) {
     const b = buffers.get(cue.rank);
-    if (!b) return;
+    if (!b) return false;
+    // iOS suspends the audio context whenever the page goes away, and a
+    // buffer started into a suspended context makes no sound at all. Silently
+    // losing a description is the worst failure this thing has: silence is
+    // indistinguishable from nothing having happened.
+    if (ctx.state !== 'running') { ctx.resume(); return false; }
     duckFilm(b.duration);
     const src = ctx.createBufferSource();
     src.buffer = b;
@@ -137,6 +154,7 @@
     const li = document.createElement('li');
     li.innerHTML = `<span class="t">${cue.t.toFixed(1)}s</span><br>${cue.text}`;
     log.prepend(li);
+    return true;
   }
 
   async function loadTimeline(tl) {
@@ -165,9 +183,13 @@
   function fireCues(t) {
     if (!timeline) return;
     for (const cue of timeline.cues) {
-      if (!played.has(cue.rank) && cue.t <= t && t - cue.t < 4) {
+      if (played.has(cue.rank) || cue.t > t) continue;
+      if (t - cue.t < 4) {
+        // Only mark it spent if it actually made a sound.
+        if (play(cue)) played.add(cue.rank);
+      } else {
+        // Its moment has passed -- do not speak it late over a later scene.
         played.add(cue.rank);
-        play(cue);
       }
     }
   }
@@ -303,7 +325,13 @@
   // A backgrounded tab keeps its timers, so without this the loop carries on
   // after the reader has left the page.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) stopTicking(); else if (running) startTicking();
+    if (document.hidden) { stopTicking(); return; }
+    if (!running) return;
+    // The context is suspended while the page is away and does not come back
+    // by itself, so every description after the first interruption would be
+    // silent without this.
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    startTicking();
   });
 
   startBtn.addEventListener('click', () => begin('standalone'));
