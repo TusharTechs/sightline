@@ -26,7 +26,19 @@ if os.environ.get("SIGHTLINE_AWS_PROFILE"):
 
 REGION = os.environ.get("AWS_REGION", "us-west-2")
 MIN_GAP_S = 0.8
-EDGE_GUARD_S = 0.15
+# Asymmetric on purpose, and the asymmetry is the point.
+#
+# These were both 0.15 s, which meant a description began a seventh of a
+# second after the last word of dialogue. A blind reviewer watched the trailer
+# three times and only on the third did he notice the narrator say "hunter" --
+# a line that ends at 38.91 s, with our voice starting at 39.06 s. He had no
+# time to take in what he had just heard before another voice arrived.
+#
+# The pause after someone speaks is when the listener understands them, so it
+# is worth far more than the words it costs. The pause before the next line is
+# only there to avoid collision, so it can stay short.
+AFTER_SPEECH_S = 0.7
+BEFORE_SPEECH_S = 0.35
 # Words closer together than this belong to the same run of speech.
 JOIN_WORDS_S = 0.35
 
@@ -105,10 +117,14 @@ def speech_intervals(result):
     return [tuple(r) for r in runs]
 
 
-def gaps_from_speech(runs, total, min_gap=MIN_GAP_S, guard=EDGE_GUARD_S):
+def gaps_from_speech(runs, total, min_gap=MIN_GAP_S,
+                     after=AFTER_SPEECH_S, before=BEFORE_SPEECH_S):
     gaps, cursor = [], 0.0
     for s, e in runs + [(total, total)]:
-        lo, hi = cursor + guard, s - guard
+        # Leave room after the previous line to land, and before the next to
+        # begin. The first gap starts at 0, where there is nothing to land.
+        lo = cursor + (after if cursor > 0 else 0.0)
+        hi = s - before
         if hi - lo >= min_gap:
             gaps.append({"start": round(lo, 3), "end": round(hi, 3),
                          "len_s": round(hi - lo, 3)})
