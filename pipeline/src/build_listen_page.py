@@ -82,6 +82,8 @@ PAGE = """<title>Can you hear what the machine hears?</title>
 // The key is base64'd so that a casual look at the page does not spoil the
 // test. That is all it is for; anyone who wants to read it can.
 const KEY = JSON.parse(atob("{enc}"));
+// Which clips are the same audio played twice, by index.
+const TWIN = JSON.parse(atob("{twins}"));
 const form = document.getElementById('quiz');
 const out = document.getElementById('out');
 form.addEventListener('submit', e => {{
@@ -129,6 +131,16 @@ form.addEventListener('submit', e => {{
        ${{verdict}}</p>
     ${{ducked ? `<p>You could not tell on ${{ducked}} more. That is not counted
        against you, and it is worth knowing.</p>` : ''}}
+    ${{(() => {{
+      const pairs = TWIN.map((t,i)=>t?[t-1,i]:null).filter(Boolean);
+      if (!pairs.length) return '';
+      const same = pairs.filter(([x,y])=>said[x]===said[y]).length;
+      return `<p>${{pairs.length}} of the clips were the same audio played
+        twice, in different places. You gave the same answer both times on
+        ${{same}} of ${{pairs.length}}. That is the fair yardstick: a machine that
+        changes its mind is only unreliable if it does so more often than a
+        listener does.</p>`;
+    }})()}}
     ${{probes.length ? `<p>${{probes.length}} of the clips were ones my own code
        could not call either. They are not scored. You said
        ${{probes.map(i=>nice(said[i])).join(', ')}} to those.</p>` : ''}}
@@ -173,7 +185,9 @@ def main():
         answers.append(k["answer"])
 
     enc = base64.b64encode(json.dumps(answers).encode()).decode()
-    html = PAGE.format(n=len(key), items="\n".join(items), enc=enc)
+    twins = base64.b64encode(
+        json.dumps([k.get("twin") for k in key]).encode()).decode()
+    html = PAGE.format(n=len(key), items="\n".join(items), enc=enc, twins=twins)
     with open(os.path.join(a.out, "index.html"), "w") as f:
         f.write(html)
     print(f"  {len(key)} clips -> {a.out}/index.html")
