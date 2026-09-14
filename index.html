@@ -96,7 +96,7 @@
   let mode = 'standalone';
   let ctx = null;            // unlocked by the Start gesture; mobile requires it
   let timeline = null;
-  const buffers = new Map();  // rank -> AudioBuffer
+  const srcs = new Map();     // rank -> url of the spoken line
   const played = new Set();
   let running = false, lastState = null, tickTimer = null;
   let lastAge = null;
@@ -122,6 +122,45 @@
   // the interval kept running. Only ever write when the text actually changes.
   const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
 
+  // Descriptions play through plain audio elements, not through the Web Audio
+  // graph.
+  //
+  // They used to be decoded buffers. That works on a desktop and is fragile on
+  // iOS, where the audio context suspends whenever the page goes away and does
+  // not reliably come back: a buffer started into a suspended context makes no
+  // sound. Guarding against that by refusing to play until the context was
+  // running turned an intermittent loss into a total one for the listener who
+  // reported it -- every description gone. Two attempts at fixing this from a
+  // desktop browser made it worse each time.
+  //
+  // An audio element does not care about the context's state. It needs
+  // unlocking once, inside the gesture that starts playback, which is what
+  // the pool below is for. The context is now only used to duck the film, and
+  // if ducking fails the description is merely hard to hear rather than
+  // absent. That is the right way round.
+  const VOICES = 3;
+  let voices = [], voiceAt = 0;
+  function makeVoices() {
+    if (voices.length) return;
+    for (let i = 0; i < VOICES; i++) {
+      const a = new Audio();
+      a.preload = 'auto';
+      voices.push(a);
+    }
+  }
+  function unlockVoices() {
+    // Must happen inside the user gesture. Playing silence marks each element
+    // as user-initiated, so later programmatic play() calls are allowed.
+    for (const a of voices) {
+      a.muted = true;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => {});
+      a.pause();
+      a.currentTime = 0;
+      a.muted = false;
+    }
+  }
+
   async function fetchBuffer(cue) {
     // Static hosting serves mp3 (a twenty-fifth of the bytes); the local
     // service wraps the device's PCM as wav on the way out. Try the small one
@@ -129,28 +168,28 @@
     const base = cue.pcm.replace(/\.pcm$/, '');
     for (const ext of ['.mp3', '.wav']) {
       try {
-        const res = await fetch(base + ext);
+        const res = await fetch(base + ext, {method: 'HEAD'});
         if (!res.ok) continue;
-        const buf = await res.arrayBuffer();
-        buffers.set(cue.rank, await ctx.decodeAudioData(buf));
+        srcs.set(cue.rank, base + ext);
         return;
       } catch {}
     }
   }
 
+  const srcFor = (cue) => srcs.get(cue.rank);
+
   function play(cue) {
-    const b = buffers.get(cue.rank);
-    if (!b) return false;
-    // iOS suspends the audio context whenever the page goes away, and a
-    // buffer started into a suspended context makes no sound at all. Silently
-    // losing a description is the worst failure this thing has: silence is
-    // indistinguishable from nothing having happened.
-    if (ctx.state !== 'running') { ctx.resume(); return false; }
-    duckFilm(b.duration);
-    const src = ctx.createBufferSource();
-    src.buffer = b;
-    src.connect(ctx.destination);
-    src.start();
+    const url = srcFor(cue);
+    if (!url) return false;
+    const a = voices[voiceAt++ % voices.length];
+    a.src = url;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+    // Duck for as long as the timeline says the line runs. The context may be
+    // asleep; waking it is worth attempting but the description does not wait
+    // on it.
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    duckFilm(cue.duration || 4);
     const li = document.createElement('li');
     li.innerHTML = `<span class="t">${cue.t.toFixed(1)}s</span><br>${cue.text}`;
     log.prepend(li);
@@ -275,6 +314,10 @@
 
   async function begin(which) {
     mode = which;
+    // Both of these must happen inside the click, before any await: iOS only
+    // grants audio permission synchronously within the gesture.
+    makeVoices();
+    unlockVoices();
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') await ctx.resume();
     running = true;
