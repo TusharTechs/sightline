@@ -53,7 +53,11 @@
 <button id="start" class="primary">Play with description</button>
 <button id="follow">Follow a Fire TV instead</button>
 
-<div class="status" role="status" aria-live="polite">
+<!-- Deliberately NOT a live region. It holds a position that changes every
+     second, and a live region would have a screen reader read the clock out
+     loud forever. State changes are announced once, explicitly, through the
+     assertive region below. The text stays here to be read on demand. -->
+<div class="status">
   <b id="statusLine">Ready</b>
   <span class="dim" id="detail">Press Play with description to start.</span>
 </div>
@@ -94,10 +98,17 @@
   let timeline = null;
   const buffers = new Map();  // rank -> AudioBuffer
   const played = new Set();
-  let running = false;
+  let running = false, lastState = null, tickTimer = null;
   let lastAge = null;
 
   const say = (msg) => { announce.textContent = ''; setTimeout(() => announce.textContent = msg, 40); };
+
+  // Writing the same string into a live region is still a mutation, and a
+  // screen reader reads it again. tick() runs four times a second, so an
+  // unguarded assignment made VoiceOver repeat "Paused, 52 seconds in"
+  // forever -- and kept doing it after the reader had left the page, because
+  // the interval kept running. Only ever write when the text actually changes.
+  const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
 
   async function fetchBuffer(cue) {
     // Static hosting serves mp3 (a twenty-fifth of the bytes); the local
@@ -163,26 +174,56 @@
 
   // Standalone: the film is here, so duck it under each description exactly as
   // the television does. Without this the score buries the voice at its peaks.
-  let duckTimer = null;
+  //
+  // This cannot be done with film.volume. On iOS that property is read-only:
+  // assigning to it is silently ignored, so the duck did nothing on exactly the
+  // devices most likely to be used with VoiceOver, and a blind reviewer lost
+  // the description under the score. Reported by a listener on an iPhone, not
+  // caught here, because it works on a desktop browser.
+  //
+  // Routing the film through a gain node works everywhere. Once an element is
+  // connected to the graph its audio only reaches the speakers through the
+  // graph, so the connection has to be made before playback and kept.
+  let duckTimer = null, filmGain = null;
+  function routeFilm() {
+    if (filmGain || !ctx) return;
+    try {
+      const src = ctx.createMediaElementSource(film);
+      filmGain = ctx.createGain();
+      src.connect(filmGain).connect(ctx.destination);
+    } catch { filmGain = null; }   // already routed, or not permitted
+  }
+  function setFilmGain(v, seconds) {
+    if (filmGain) {
+      const now = ctx.currentTime;
+      filmGain.gain.cancelScheduledValues(now);
+      filmGain.gain.setValueAtTime(filmGain.gain.value, now);
+      filmGain.gain.linearRampToValueAtTime(v, now + seconds);
+    } else {
+      film.volume = v;           // desktop fallback if routing was refused
+    }
+  }
   function duckFilm(seconds) {
     if (mode !== 'standalone') return;
     clearTimeout(duckTimer);
-    film.volume = 0.22;
-    duckTimer = setTimeout(() => { film.volume = 1; }, seconds * 1000 + 260);
+    setFilmGain(0.22, 0.14);
+    duckTimer = setTimeout(() => setFilmGain(1, 0.26), seconds * 1000 + 260);
   }
 
   async function tick() {
     if (!running) return;
     if (mode === 'standalone') {
       lastT = film.currentTime || 0;
-      statusLine.textContent = film.paused ? 'Paused' : 'Playing';
-      detail.textContent = `${lastT.toFixed(0)} seconds in`;
+      const now = film.paused ? 'Paused' : 'Playing';
+      if (now !== lastState) { if (lastState !== null) say(now); lastState = now; }
+      setText(statusLine, now);
+      setText(detail, `${lastT.toFixed(0)} seconds in`);
       fireCues(lastT);
       return;
     }
     let s;
     try { s = await connect(); }
-    catch { statusLine.textContent = 'Lost the television'; detail.textContent = 'Trying again.'; return; }
+    catch { setText(statusLine, 'Lost the television'); setText(detail, 'Trying again.'); return; }
 
     // The TV reports its position a few times a second; estimate between reports
     // so description does not arrive in steps.
@@ -191,11 +232,11 @@
     lastT = t;
 
     if (age == null || age > 3) {
-      statusLine.textContent = 'Waiting for the television';
-      detail.textContent = 'Start playback on the Fire TV.';
+      setText(statusLine, 'Waiting for the television');
+      setText(detail, 'Start playback on the Fire TV.');
     } else {
-      statusLine.textContent = s.playing ? 'Playing' : 'Paused';
-      detail.textContent = `${t.toFixed(0)} seconds in, ${s.rate || 1}x speed`;
+      setText(statusLine, s.playing ? 'Playing' : 'Paused');
+      setText(detail, `${t.toFixed(0)} seconds in, ${s.rate || 1}x speed`);
       if (lastAge !== null && (age > 3) !== (lastAge > 3)) say(statusLine.textContent);
       lastAge = age;
     }
@@ -222,6 +263,9 @@
       startBtn.textContent = 'Playing with description';
       followBtn.hidden = true;
       film.hidden = false;
+      // Route before the first play, while we are still inside the gesture
+      // that unlocked the context.
+      routeFilm();
       // Answers are generated live against the current frame, so they need a
       // service. Offer the button only where one is actually reachable rather
       // than letting someone press something that cannot work.
@@ -247,8 +291,20 @@
       say('Listening for the television.');
     }
     tick();
-    setInterval(tick, 250);
+    startTicking();
   }
+
+  function startTicking() {
+    if (tickTimer === null) tickTimer = setInterval(tick, 250);
+  }
+  function stopTicking() {
+    if (tickTimer !== null) { clearInterval(tickTimer); tickTimer = null; }
+  }
+  // A backgrounded tab keeps its timers, so without this the loop carries on
+  // after the reader has left the page.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopTicking(); else if (running) startTicking();
+  });
 
   startBtn.addEventListener('click', () => begin('standalone'));
   followBtn.addEventListener('click', () => begin('follow'));
