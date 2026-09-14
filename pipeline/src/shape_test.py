@@ -44,6 +44,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from audio_events import analyse
 
 
+MIN_TWIN_GAP = 4      # clips between a repeat and its twin
+
+
 def classify(o):
     if o.get("unsure"):
         return "unsure"
@@ -136,6 +139,10 @@ def main():
     p.add_argument("--max-per-class", type=int, default=12)
     p.add_argument("--max-probes", type=int, default=3,
                    help="clips the code could not call, included unscored")
+    p.add_argument("--repeats", type=int, default=3,
+                   help="clips played twice, to measure the listener's own "
+                        "consistency -- the only fair yardstick for the "
+                        "machine's")
     p.add_argument("--seed", type=int, default=None)
     a = p.parse_args()
 
@@ -164,22 +171,45 @@ def main():
     probes = rng.sample(by["unsure"], min(a.max_probes, len(by["unsure"])))
     chosen += [(o, "unsure") for o in probes]
     rng.shuffle(chosen)
+
+    # Some clips appear twice. A machine that changes its mind on 1% of calls
+    # is only bad if a listener changes theirs less often, and nobody knows
+    # that number, so the test measures it rather than assuming it.
+    dupes = rng.sample(range(len(chosen)), min(a.repeats, len(chosen)))
+    chosen += [(chosen[i][0], chosen[i][1]) for i in dupes]
+    # A repeat sitting next to its twin is recognised rather than judged, which
+    # measures memory instead of hearing. Keep them apart.
+    for _ in range(200):
+        rng.shuffle(chosen)
+        pos = {}
+        gaps_ok = True
+        for i, (o, _k) in enumerate(chosen):
+            if o["t"] in pos and i - pos[o["t"]] < MIN_TWIN_GAP:
+                gaps_ok = False
+                break
+            pos[o["t"]] = i
+        if gaps_ok:
+            break
     print(f"  {len(probes)} unscored probe(s) included "
           f"(of {len(by['unsure'])} available)")
 
     os.makedirs(a.out, exist_ok=True)
     key = []
+    seen = {}
     for i, (o, k) in enumerate(chosen, 1):
         name = f"clip-{i:02d}-{uuid.uuid4().hex[:6]}.mp3"
         cut(a.media, o["t"], a.lead, a.tail, os.path.join(a.out, name))
-        key.append({"file": name, "answer": k, "t": o["t"],
+        twin = seen.get(o["t"])
+        seen.setdefault(o["t"], i)
+        key.append({"file": name, "answer": k, "t": o["t"], "twin": twin,
                     "attack_ms": o.get("attack_ms"),
                     "above_floor_1s_db": o.get("above_floor_1s_db"),
                     "above_floor_2s_db": o.get("above_floor_2s_db")})
 
     with open(os.path.join(a.out, "key.json"), "w") as f:
         json.dump(key, f, indent=2)
-    print(f"  {len(chosen)} clips ({n} per class) -> {a.out}")
+    pairs = sum(1 for k in key if k["twin"])
+    print(f"  {len(chosen)} clips ({n} per class, {pairs} played twice) -> {a.out}")
     print(f"  sort them into two groups by ear, THEN read {a.out}/key.json")
     print(f"  chance of a perfect sort by guessing: "
           f"1 in {_combinations(len(chosen), n)}")

@@ -92,16 +92,30 @@ TAIL_PAD_S = TAIL_LONG_S + TAIL_WINDOW_S
 
 
 def load_mono(media, start, end):
+    """Mono float samples at SR.
+
+    Read as 32-bit float, not 16-bit. This film -- and any lossily encoded one
+    -- decodes to samples above full scale, and converting those to 16-bit
+    clips them. Clipping flattens peaks, a flattened peak measures as a slower
+    attack, and a slower attack reads as music. So a 16-bit read was quietly
+    turning some impacts into swells before the rule ever saw them.
+
+    Found by perturbation: attenuating the whole film by 3 dB flipped five
+    onsets from swell to hit, always in that direction, because the quieter
+    copy survived the conversion intact while the original did not. A rule that
+    is really measuring shape should not care about gain, and this one does not
+    -- the loader did.
+    """
     with tempfile.TemporaryDirectory() as td:
-        wav = os.path.join(td, "a.wav")
+        raw_path = os.path.join(td, "a.raw")
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{start:.3f}",
-             "-to", f"{end:.3f}", "-i", media, "-vn", "-ac", "1", "-ar", str(SR),
-             "-f", "wav", wav], check=True)
-        import wave
-        with wave.open(wav) as w:
-            raw = w.readframes(w.getnframes())
-    return np.frombuffer(raw, dtype=np.int16).astype(np.float64) / 32768.0
+             "-to", f"{end:.3f}", "-i", media, "-vn", "-ac", "1",
+             "-ar", str(SR), "-c:a", "pcm_f32le", "-f", "f32le", raw_path],
+            check=True)
+        with open(raw_path, "rb") as f:
+            raw = f.read()
+    return np.frombuffer(raw, dtype=np.float32).astype(np.float64)
 
 
 def attack_ms(x, centre_s, window_s=REFINE_WINDOW_S):
