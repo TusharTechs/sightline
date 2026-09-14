@@ -13,98 +13,98 @@
   "builtForRate": 1.0,
   "gaps": [
     {
-      "start": 0.15,
-      "end": 12.04
+      "start": 0.0,
+      "end": 11.84
     },
     {
-      "start": 14.53,
-      "end": 18.41
+      "start": 15.08,
+      "end": 18.21
     },
     {
-      "start": 20.05,
-      "end": 36.65
+      "start": 20.6,
+      "end": 36.45
     },
     {
-      "start": 39.06,
-      "end": 41.52
+      "start": 39.61,
+      "end": 41.32
     },
     {
-      "start": 44.01,
-      "end": 52.142
+      "start": 44.56,
+      "end": 51.858
     }
   ],
   "cues": [
     {
-      "t": 6.095,
+      "t": 5.92,
       "rank": 1,
       "pcm": "desc-01.pcm",
-      "text": "A red-haired woman in furs climbs a snowbound mountain, leaning on a tall wooden staff.",
-      "duration": 5.003,
+      "text": "A figure in furs climbs a snowbound mountain, leaning on a tall staff.",
+      "duration": 4.247,
       "caused_by_viewer": false,
-      "why_ranked": "introduces protagonist and snowy journey setting"
+      "why_ranked": "opening establishes protagonist and snowbound setting"
     },
     {
-      "t": 14.53,
+      "t": 15.08,
       "rank": 4,
       "pcm": "desc-04.pcm",
-      "text": "Indoors now, furs gone, barred wall behind her.",
-      "duration": 3.248,
+      "text": "Indoors now, hood off, listening.",
+      "duration": 2.454,
       "caused_by_viewer": false,
-      "why_ranked": "shift indoors, character detail revealed"
+      "why_ranked": "shift indoors shows her changed appearance and a listener"
     },
     {
-      "t": 20.05,
-      "rank": 2,
-      "pcm": "desc-02.pcm",
-      "text": "Outside now, she edges along a wall in a rubble-strewn alley between leaning stone houses.",
-      "duration": 5.329,
-      "caused_by_viewer": false,
-      "why_ranked": "new location: ruined stone town, hiding"
-    },
-    {
-      "t": 25.583,
-      "rank": 3,
-      "pcm": "desc-03.pcm",
-      "text": "Now on sunlit ruined battlements, a winged beast swoops past her toward a distant tower.",
-      "duration": 4.993,
-      "caused_by_viewer": false,
-      "why_ranked": "winged creature appears, key threat"
-    },
-    {
-      "t": 31.117,
-      "rank": 5,
-      "pcm": "desc-05.pcm",
-      "text": "The creature's tail whips past her face; she stares, mouth open.",
-      "duration": 4.176,
-      "caused_by_viewer": false,
-      "why_ranked": "creature attack close on her"
-    },
-    {
-      "t": 39.06,
+      "t": 20.6,
       "rank": 6,
       "pcm": "desc-06.pcm",
-      "text": "Tiny figure crossing vast dunes",
-      "duration": 2.233,
+      "text": "She picks her way down a deserted alley strewn with rubble and broken timber.",
+      "duration": 3.83,
       "caused_by_viewer": false,
-      "why_ranked": "journey continues across desert"
+      "why_ranked": "another location shift through ruins"
     },
     {
-      "t": 44.01,
+      "t": 25.883,
+      "rank": 2,
+      "pcm": "desc-02.pcm",
+      "text": "A winged dragon banks through a golden sky. Another flies far below it.",
+      "duration": 4.593,
+      "caused_by_viewer": false,
+      "why_ranked": "dragons revealed, the central story element"
+    },
+    {
+      "t": 31.167,
+      "rank": 3,
+      "pcm": "desc-03.pcm",
+      "text": "A pink-haired girl braces against a branch, staring up, mouth open.",
+      "duration": 4.119,
+      "caused_by_viewer": false,
+      "why_ranked": "identifies the girl and her alarmed reaction"
+    },
+    {
+      "t": 39.61,
+      "rank": 5,
+      "pcm": "desc-05.pcm",
+      "text": "Alone on endless dunes.",
+      "duration": 1.644,
+      "caused_by_viewer": false,
+      "why_ranked": "major move to desert with spear, time passed"
+    },
+    {
+      "t": 44.56,
       "rank": 7,
       "pcm": "desc-07.pcm",
-      "text": "Title card: a tree within a circle. Sintel.",
-      "duration": 3.381,
+      "text": "Title card: a tree. SINTEL.",
+      "duration": 2.533,
       "caused_by_viewer": false,
       "why_ranked": "title card, no story content"
     },
     {
-      "t": 48.076,
+      "t": 48.209,
       "rank": 8,
       "pcm": "desc-08.pcm",
-      "text": "A title card reads: Coming Soon.",
-      "duration": 2.094,
+      "text": "Title card replaced by two words: Coming Soon.",
+      "duration": 2.889,
       "caused_by_viewer": false,
-      "why_ranked": "promotional end card"
+      "why_ranked": "end card promo, no story content"
     }
   ]
 }
