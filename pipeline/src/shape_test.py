@@ -44,7 +44,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from audio_events import analyse
 
 
-MIN_TWIN_GAP = 4      # clips between a repeat and its twin
+# A repeat is only a fair second look if the listener cannot remember the
+# first. The reviewer's warning:
+#
+#   "The second play isn't cold. I might remember the clip, and if I do I'll
+#    agree with myself for the wrong reason. My number will come out better
+#    than it deserves. Space them as far apart as you can."
+#
+# So twins are pushed into opposite ends of the running order rather than
+# merely kept apart, and the requirement relaxes only if nothing satisfies it.
+TWIN_GAP_FRACTION = 0.55
 
 
 def classify(o):
@@ -179,17 +188,25 @@ def main():
     chosen += [(chosen[i][0], chosen[i][1]) for i in dupes]
     # A repeat sitting next to its twin is recognised rather than judged, which
     # measures memory instead of hearing. Keep them apart.
-    for _ in range(200):
-        rng.shuffle(chosen)
-        pos = {}
-        gaps_ok = True
-        for i, (o, _k) in enumerate(chosen):
-            if o["t"] in pos and i - pos[o["t"]] < MIN_TWIN_GAP:
-                gaps_ok = False
+    want = max(2, int(len(chosen) * TWIN_GAP_FRACTION))
+    best, best_gap = list(chosen), -1
+    while want >= 2:
+        for _ in range(400):
+            rng.shuffle(chosen)
+            pos, worst = {}, 10 ** 6
+            for i, (o, _k) in enumerate(chosen):
+                if o["t"] in pos:
+                    worst = min(worst, i - pos[o["t"]])
+                pos[o["t"]] = i
+            if worst > best_gap:
+                best, best_gap = list(chosen), worst
+            if worst >= want:
                 break
-            pos[o["t"]] = i
-        if gaps_ok:
+        if best_gap >= want:
             break
+        want -= 1
+    chosen = best
+    print(f"  repeats are at least {best_gap} clips apart")
     print(f"  {len(probes)} unscored probe(s) included "
           f"(of {len(by['unsure'])} available)")
 
