@@ -35,7 +35,7 @@ def main():
         ok = mine == k["answer"]
         right += ok
         wrong += not ok
-        f2 = k.get("fell_2s_db")
+        f2 = k.get("above_floor_2s_db")
         print(f"   {i:>4}  {mine:<9}  {k['answer']:<9}  {'ok' if ok else 'MISS':>4}"
               f"  {str(k['attack_ms'])+'ms':>7}  "
               f"{(str(f2)+'dB') if f2 is not None else '-':>8}   t={k['t']}s")

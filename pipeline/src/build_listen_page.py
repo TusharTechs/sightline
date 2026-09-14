@@ -49,8 +49,9 @@ PAGE = """<title>Can you hear what the machine hears?</title>
 </style>
 <main>
   <h1>Can you hear what the machine hears?</h1>
-  <p class="sub">{n} clips, six seconds each. Half of them my code calls events.
-  Half it calls the music. Can you tell which is which?</p>
+  <p class="sub">{n} clips, six seconds each. Most of them my code calls either
+  an event or the music. A few it could not call at all. Can you tell which is
+  which?</p>
 
   <div class="task">
     <p><strong>The task.</strong> Play each clip and decide: did
@@ -59,7 +60,9 @@ PAGE = """<title>Can you hear what the machine hears?</title>
     <p>Listen to what comes <em>after</em> the loud moment, not just the loud
     moment itself. That is where the two differ.</p>
     <p>Every clip is level-matched, so loudness will not tell you the answer.
-    Guess when you are unsure rather than skipping. It takes about ten minutes.</p>
+    If you genuinely cannot tell, say so &mdash; that is an answer, not a
+    failure, and it is more useful to me than a guess. It takes about ten
+    minutes.</p>
   </div>
 
   <form id="quiz">
@@ -90,27 +93,45 @@ form.addEventListener('submit', e => {{
   const missing = said.map((v,i)=>v?null:i+1).filter(Boolean);
   if (missing.length) {{
     out.innerHTML = `<p class="res">Still unanswered: clip ${{missing.join(', ')}}.
-      Please guess rather than leave one blank.</p>`;
+      "I could not tell" counts as an answer.</p>`;
     return;
   }}
-  const right = said.filter((v,i)=>v===KEY[i]).length;
-  const n = KEY.length;
+  // Probes are clips the code itself could not call. They are not scored.
+  const scored = KEY.map((k,i)=>i).filter(i => KEY[i] !== 'unsure');
+  const decided = scored.filter(i => said[i] !== 'unsure');
+  const right = decided.filter(i => said[i]===KEY[i]).length;
+  const n = decided.length;
+  const ducked = scored.length - decided.length;
+  const probes = KEY.map((k,i)=>i).filter(i => KEY[i] === 'unsure');
+  if (n === 0) {{
+    out.innerHTML = `<p class="res">You could not tell on any of them. That is a
+      real result and I would genuinely like to know it.</p>`;
+    return;
+  }}
   // One-sided binomial: how often would guessing do at least this well?
   const C=(a,b)=>{{let r=1;for(let i=0;i<b;i++)r=r*(a-i)/(i+1);return r;}};
   let p=0; for(let i=right;i<=n;i++) p+=C(n,i); p/=Math.pow(2,n);
   const verdict = p<0.05
     ? 'That is better than guessing. The difference the code makes is audible to you.'
     : 'That is about what guessing gets. On this evidence the difference is not audible to you.';
-  const nice = s => s==='hit' ? 'arrived' : 'built up';
+  const nice = s => s==='hit' ? 'arrived' : s==='swell' ? 'built up' : 'could not tell';
   const rows = said.map((v,i)=>{{
-    const ok = v===KEY[i];
+    let note, cls='';
+    if (KEY[i]==='unsure') {{ note='not scored &mdash; the code could not call this one either'; }}
+    else if (v==='unsure') {{ note='not scored'; }}
+    else {{ const ok = v===KEY[i]; cls = ok?'ok':'no'; note = ok?'correct':'missed'; }}
     return `<tr><td>${{i+1}}</td><td>${{nice(v)}}</td><td>${{nice(KEY[i])}}</td>
-      <td class="${{ok?'ok':'no'}}">${{ok?'correct':'missed'}}</td></tr>`;
+      <td class="${{cls}}">${{note}}</td></tr>`;
   }}).join('');
   out.innerHTML = `<div class="res">
-    <p><strong>${{right}} out of ${{n}} correct.</strong></p>
+    <p><strong>${{right}} out of ${{n}} correct</strong>, on the ${{n}} you called.</p>
     <p>Guessing alone scores this well or better ${{(p*100).toFixed(1)}}% of the time.
        ${{verdict}}</p>
+    ${{ducked ? `<p>You could not tell on ${{ducked}} more. That is not counted
+       against you, and it is worth knowing.</p>` : ''}}
+    ${{probes.length ? `<p>${{probes.length}} of the clips were ones my own code
+       could not call either. They are not scored. You said
+       ${{probes.map(i=>nice(said[i])).join(', ')}} to those.</p>` : ''}}
     <table><caption class="sub">Clip by clip</caption>
       <tr><th>Clip</th><th>You said</th><th>Code said</th><th></th></tr>
       ${{rows}}</table>
@@ -129,6 +150,7 @@ ITEM = """    <fieldset class="clip">
       <div class="choices">
         <label><input type="radio" name="q{n}" value="hit"> Something arrived</label>
         <label><input type="radio" name="q{n}" value="swell"> The music built up</label>
+        <label><input type="radio" name="q{n}" value="unsure"> I could not tell</label>
       </div>
     </fieldset>"""
 

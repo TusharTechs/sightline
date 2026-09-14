@@ -26,6 +26,10 @@ So this builds a sorting test instead:
     it has to go without touching shape. A dynamic loudness normaliser is a
     compressor, and a compressor exists precisely to reshape attacks, so it
     cannot be used to test whether attacks are audible
+  - the code has three answers and so does the page. Clips the code could not
+    call are included as unscored probes, and a listener can always say they
+    could not tell. Forcing a binary choice manufactures confidence nobody has,
+    which is the priming problem one layer up
   - filenames are random. The answer key is written separately and should not
     be opened until the sorting is done
 
@@ -65,8 +69,6 @@ def uncontaminated(onsets, lead, tail, min_gap):
     picked, last_end = [], -1e9
     for o in sorted(onsets, key=lambda o: o["t"]):
         k = classify(o)
-        if k == "unsure":
-            continue
         lo, hi = o["t"] - lead, o["t"] + tail
         if lo < 0:
             continue
@@ -132,6 +134,8 @@ def main():
     p.add_argument("--tail", type=float, default=3.5)
     p.add_argument("--min-gap", type=float, default=1.0)
     p.add_argument("--max-per-class", type=int, default=12)
+    p.add_argument("--max-probes", type=int, default=3,
+                   help="clips the code could not call, included unscored")
     p.add_argument("--seed", type=int, default=None)
     a = p.parse_args()
 
@@ -143,7 +147,7 @@ def main():
 
     onsets = scan(a.media, dur)
     picked = uncontaminated(onsets, a.lead, a.tail, a.min_gap)
-    by = {"hit": [], "swell": []}
+    by = {"hit": [], "swell": [], "unsure": []}
     for o, k in picked:
         by[k].append(o)
 
@@ -154,7 +158,14 @@ def main():
               f"hits={len(by['hit'])} swells={len(by['swell'])}", file=sys.stderr)
     chosen = ([(o, "hit") for o in rng.sample(by["hit"], min(n, len(by["hit"])))] +
               [(o, "swell") for o in rng.sample(by["swell"], min(n, len(by["swell"])))])
+    # Probes are not scored. They are the clips the code itself declined to
+    # call, and the point of including them is to see what a listener does with
+    # a sound the machine had no answer for.
+    probes = rng.sample(by["unsure"], min(a.max_probes, len(by["unsure"])))
+    chosen += [(o, "unsure") for o in probes]
     rng.shuffle(chosen)
+    print(f"  {len(probes)} unscored probe(s) included "
+          f"(of {len(by['unsure'])} available)")
 
     os.makedirs(a.out, exist_ok=True)
     key = []
@@ -163,8 +174,8 @@ def main():
         cut(a.media, o["t"], a.lead, a.tail, os.path.join(a.out, name))
         key.append({"file": name, "answer": k, "t": o["t"],
                     "attack_ms": o.get("attack_ms"),
-                    "fell_1s_db": o.get("fell_1s_db"),
-                    "fell_2s_db": o.get("fell_2s_db")})
+                    "above_floor_1s_db": o.get("above_floor_1s_db"),
+                    "above_floor_2s_db": o.get("above_floor_2s_db")})
 
     with open(os.path.join(a.out, "key.json"), "w") as f:
         json.dump(key, f, indent=2)

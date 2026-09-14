@@ -70,8 +70,23 @@ SLOW_MS = 120.0
 TAIL_WINDOW_S = 0.20      # width of each level probe
 TAIL_SHORT_S = 1.0        # "back down inside a second"
 TAIL_LONG_S = 2.0         # "still sitting there two seconds later"
-TAIL_FELL_DB = 6.0        # fallen this far by TAIL_SHORT_S -> it was an event
-TAIL_HELD_DB = 3.0        # still within this of peak at TAIL_LONG_S -> music
+# Measured against the level BEFORE the onset, not against the peak.
+#
+# Same reviewer again, on the loudest onset in the trailer, which fell 3 dB in a
+# second and 15 dB in two and so counted as neither:
+#
+#   "That's not your rule failing. That's two things happening at once. A hit
+#    doesn't decay into silence, it decays into whatever is underneath it. Put a
+#    big impact on top of sustained score and the first second can't fall,
+#    because the music is holding the floor up. After the peak you're measuring
+#    the loudest thing present, not the decay of the event."
+#
+# So the question is not how far it dropped, it is whether it came back to where
+# it started. Back down to the old floor is an event, however long it took.
+# Settling above the old floor is something that arrived and stayed, which is
+# the music changing rather than an event.
+BACK_HOME_DB = 3.0        # within this of the pre-onset floor -> it went away
+STAYED_UP_DB = 3.0        # still this far above the old floor -> it stayed
 # Extra audio loaded past the window so the tail of a late onset is measurable.
 TAIL_PAD_S = TAIL_LONG_S + TAIL_WINDOW_S
 
@@ -127,28 +142,29 @@ def _level_db(x, centre_s, width_s=TAIL_WINDOW_S):
     return float(20 * np.log10(np.sqrt((seg ** 2).mean()) + 1e-9))
 
 
-def decay(x, peak_s):
-    """How far the level had fallen from its peak one second later, and two.
+def settle(x, peak_s, floor_db):
+    """How far above the PRE-ONSET floor the level still sits, one second after
+    the peak and two.
+
+    Near zero means the sound went away and left the scene as it found it.
+    A positive number means something arrived and is still there.
 
     Either may be None when there is not enough audio after the peak to look.
-    An event drops away; music does not.
     """
-    top = _level_db(x, peak_s)
-    if top is None:
-        return None, None
     out = []
     for dt in (TAIL_SHORT_S, TAIL_LONG_S):
         later = _level_db(x, peak_s + dt)
-        out.append(None if later is None else round(top - later, 1))
+        out.append(None if later is None else round(later - floor_db, 1))
     return out[0], out[1]
 
 
-def shape_of(x, centre_s):
-    """Is this a hit or a swell? Returns (attack_ms, fell_1s, fell_2s, verdict)
+def shape_of(x, centre_s, floor_db):
+    """Is this a hit or a swell? Returns (attack_ms, above_1s, above_2s, verdict)
     where verdict is True for a hit, False for a swell, and None for not sure.
 
     The attack settles the clear cases. Everything near the boundary is settled
-    by the tail instead, and anything ambiguous on both is left alone.
+    by whether the level came back to where it started, and anything ambiguous
+    on both is left alone.
     """
     a, peak_s = attack_ms(x, centre_s)
     if a is None:
@@ -158,12 +174,15 @@ def shape_of(x, centre_s):
     if a > SLOW_MS:
         return a, None, None, False
 
-    fell_1s, fell_2s = decay(x, peak_s)
-    if fell_1s is not None and fell_1s >= TAIL_FELL_DB:
-        return a, fell_1s, fell_2s, True          # gone inside a second
-    if fell_2s is not None and fell_2s < TAIL_HELD_DB:
-        return a, fell_1s, fell_2s, False         # still sitting there
-    return a, fell_1s, fell_2s, None              # tie goes to silence
+    above_1s, above_2s = settle(x, peak_s, floor_db)
+    # Came home, at either checkpoint. It took whatever time it took.
+    if (above_1s is not None and above_1s <= BACK_HOME_DB) or \
+       (above_2s is not None and above_2s <= BACK_HOME_DB):
+        return a, above_1s, above_2s, True
+    # Two seconds on and still well above where it started: it stayed.
+    if above_2s is not None and above_2s > STAYED_UP_DB:
+        return a, above_1s, above_2s, False
+    return a, above_1s, above_2s, None             # tie goes to silence
 
 
 def analyse(media, start, end):
@@ -189,20 +208,24 @@ def analyse(media, start, end):
             t = start + i * FRAME_MS / 1000
             # Carry how sharp the rise was, so the caller can spend a limited
             # budget of frame checks on the sounds most likely to matter.
+            # The trailing median is also the floor this sound landed on, and
+            # the decay only means anything relative to it.
+            cand = {"t": round(t, 2), "rise_db": round(rise, 1),
+                    "floor_db": round(float(local), 1)}
             if onsets and t - onsets[-1]["t"] < MIN_SEPARATION_S:
                 if rise > onsets[-1]["rise_db"]:
-                    onsets[-1] = {"t": round(t, 2), "rise_db": round(rise, 1)}
+                    onsets[-1] = cand
             else:
-                onsets.append({"t": round(t, 2), "rise_db": round(rise, 1)})
+                onsets.append(cand)
 
     # Now measure the shape of each, and keep only the hits.
     for o in onsets:
-        a, fell_1s, fell_2s, verdict = shape_of(x, o["t"] - start)
+        a, above_1s, above_2s, verdict = shape_of(x, o["t"] - start, o["floor_db"])
         o["attack_ms"] = a
-        if fell_1s is not None:
-            o["fell_1s_db"] = fell_1s
-        if fell_2s is not None:
-            o["fell_2s_db"] = fell_2s
+        if above_1s is not None:
+            o["above_floor_1s_db"] = above_1s
+        if above_2s is not None:
+            o["above_floor_2s_db"] = above_2s
         o["transient"] = bool(verdict)
         if verdict is None:
             o["unsure"] = True
