@@ -626,3 +626,84 @@ def onset_has_visible_cause(before_png, after_png, backend="anthropic"):
         client = _clients["anthropic"]
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     return client.messages.parse(**kwargs).parsed_output.model_dump()
+
+
+CONTINUITY_PROMPT = """These lines of audio description are spoken over one
+continuous stretch of film, in this order. Each was written on its own, looking
+only at its own moment, so nothing knows what any other line already said.
+
+That produces three faults, and they are the only faults you may repair:
+
+1. RE-INTRODUCING someone already established. Once a person has been
+   described, later lines refer back to them rather than meeting them again.
+   "A tattooed woman" after six lines of "she" tells the listener a second
+   person has walked in.
+2. WRONG OR INCONSISTENT reference. A person called "she" early and "he" later
+   is one of them being wrong. Use what the lines together make most likely.
+3. REPEATING a detail already given. A bloodied wing described twice, a tattoo
+   noted three times. Say it once, the first time, and use those words on
+   something else or say less.
+
+You may NOT do anything else. Do not add information no line contains. Do not
+describe anything not already described. Do not improve the writing, change
+the tone, or make anything more vivid. If a line has none of the three faults,
+return it EXACTLY as it is, character for character.
+
+Each line has a hard word limit, given in brackets. A repaired line must be no
+longer than its limit. Shorter is fine.
+
+THE LINES:
+{lines}"""
+
+
+def make_continuous(descriptions, budgets, backend="anthropic", effort=None):
+    """Repair references across a run of independently written descriptions.
+
+    Returns a list the same length. Any line the model lengthens past its
+    budget, or returns for an index that does not exist, falls back to the
+    original: a continuity repair is worth having but never worth overrunning
+    the gap it has to fit inside.
+    """
+    from pydantic import BaseModel, Field
+
+    class Line(BaseModel):
+        index: int = Field(description="0-based index of the line")
+        text: str = Field(description="the line, repaired or unchanged")
+
+    class Continuity(BaseModel):
+        lines: list[Line]
+
+    listing = "\n".join(
+        f"[{i}] (limit {budgets[i]} words) {d}" for i, d in enumerate(descriptions))
+    kwargs = dict(
+        max_tokens=16000,
+        thinking={"type": "adaptive"},
+        messages=[{"role": "user",
+                   "content": CONTINUITY_PROMPT.format(lines=listing)}],
+        output_format=Continuity,
+    )
+    if effort:
+        kwargs["output_config"] = {"effort": effort}
+    if backend.startswith("bedrock"):
+        kwargs["model"] = BEDROCK_MODEL
+        client = _client("legacy" if backend.endswith("legacy") else "mantle")
+    else:
+        import anthropic
+        if "anthropic" not in _clients:
+            _clients["anthropic"] = anthropic.Anthropic()
+        client = _clients["anthropic"]
+        kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
+
+    fixed = list(descriptions)
+    try:
+        out = client.messages.parse(**kwargs).parsed_output
+    except Exception as e:
+        print(f"  continuity pass failed, keeping originals: {e}", file=sys.stderr)
+        return fixed
+    for line in out.lines:
+        i = line.index
+        if not (0 <= i < len(fixed)):
+            continue
+        if len(line.text.split()) <= budgets[i]:
+            fixed[i] = line.text.strip()
+    return fixed
