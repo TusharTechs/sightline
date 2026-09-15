@@ -95,7 +95,10 @@ def main():
     p.add_argument("--rate", type=float, default=1.0)
     p.add_argument("--backend", default="anthropic")
     p.add_argument("--min-words", type=int, default=3)
-    p.add_argument("--max-cues", type=int, default=12)
+    p.add_argument("--max-cues", type=int, default=0,
+                   help="0 describes the whole file; a positive number keeps "
+                        "that many cues, chosen by rank across the WHOLE "
+                        "timeline rather than by taking the first N")
     p.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"])
     p.add_argument("--out", required=True)
     a = p.parse_args()
@@ -109,7 +112,21 @@ def main():
         items = json.load(open(a.transcript))["results"]["items"]
 
     td = tempfile.mkdtemp()
-    segments = gaps[: a.max_cues]
+
+    # Every speakable segment, always.
+    #
+    # This used to be gaps[:max_cues], which did not cap the number of cues --
+    # it truncated the film. With the default of 12 that meant nothing past
+    # roughly the first minute of anything was ever looked at. It never showed
+    # on a 52-second trailer, which has fewer segments than the cap, and it was
+    # found by a blind reviewer watching a three-minute clip who reported that
+    # the description simply stopped just after two minutes. It had: there were
+    # 29 segments, the first 20 were kept, and the twentieth ends at 123s.
+    #
+    # A limit on how much to SAY is a real thing to want, but it has to be
+    # applied after ranking, so what survives is the most needed description
+    # from across the whole film rather than whatever happened to come first.
+    segments = gaps
 
     def build(i, g, anchor):
         """Describe one segment. Returns a cue, or None if nothing to say."""
@@ -232,6 +249,18 @@ def main():
                 c["description"] = new
         print(f"  continuity pass: {changed} of {len(cues)} lines adjusted",
               file=sys.stderr)
+
+    if a.max_cues and len(cues) > a.max_cues:
+        from salience import rank_film_cues
+        ranked = rank_film_cues(cues, a.backend)
+        # Ranking returns positions, not times. Keep the highest-ranked from
+        # anywhere in the film, then restore chronological order.
+        best = sorted(ranked, key=lambda r: r["rank"])[: a.max_cues]
+        keep = {r["index"] for r in best if 0 <= r["index"] < len(cues)}
+        dropped = len(cues) - len(keep)
+        cues = [c for i, c in enumerate(cues) if i in keep]
+        print(f"  kept the {len(cues)} most needed cues across the whole film, "
+              f"dropped {dropped}", file=sys.stderr)
 
     json.dump({"media": a.media, "rate": a.rate, "count": len(cues), "cues": cues},
               open(a.out, "w"), indent=2)
