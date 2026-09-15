@@ -1,0 +1,230 @@
+{
+  "media": "content.mp4",
+  "mimeCodec": "video/mp4; codecs=\"avc1.640028,mp4a.40.2\"",
+  "videoWidth": 2048,
+  "videoHeight": 872,
+  "pictureRect": {
+    "x": 0.0,
+    "y": 0.0,
+    "w": 1.0,
+    "h": 1.0
+  },
+  "mode": "fit",
+  "builtForRate": 1.0,
+  "gaps": [
+    {
+      "start": 0.0,
+      "end": 6.62
+    },
+    {
+      "start": 9.98,
+      "end": 11.18
+    },
+    {
+      "start": 14.82,
+      "end": 17.37
+    },
+    {
+      "start": 23.7,
+      "end": 24.71
+    },
+    {
+      "start": 26.19,
+      "end": 27.16
+    },
+    {
+      "start": 41.51,
+      "end": 42.95
+    },
+    {
+      "start": 44.79,
+      "end": 48.53
+    },
+    {
+      "start": 51.69,
+      "end": 52.72
+    },
+    {
+      "start": 55.96,
+      "end": 73.42
+    },
+    {
+      "start": 74.48,
+      "end": 106.06
+    },
+    {
+      "start": 112.61,
+      "end": 117.89
+    },
+    {
+      "start": 118.95,
+      "end": 127.51
+    },
+    {
+      "start": 129.68,
+      "end": 150.11
+    },
+    {
+      "start": 152.08,
+      "end": 157.25
+    },
+    {
+      "start": 158.31,
+      "end": 164.56
+    },
+    {
+      "start": 166.51,
+      "end": 171.73
+    },
+    {
+      "start": 172.79,
+      "end": 184.65
+    }
+  ],
+  "cues": [
+    {
+      "t": 9.98,
+      "rank": 8,
+      "pcm": "desc-08.pcm",
+      "text": "Inside a tent",
+      "duration": 0.993,
+      "caused_by_viewer": false,
+      "why_ranked": "scene shift to tent interior"
+    },
+    {
+      "t": 14.82,
+      "rank": 7,
+      "pcm": "desc-07.pcm",
+      "text": "A bound red-haired woman lies watching.",
+      "duration": 2.139,
+      "caused_by_viewer": false,
+      "why_ranked": "establishes captive woman and captor"
+    },
+    {
+      "t": 23.7,
+      "rank": 9,
+      "pcm": "desc-09.pcm",
+      "text": "He takes her hand",
+      "duration": 0.98,
+      "caused_by_viewer": false,
+      "why_ranked": "she rises and accepts his hand"
+    },
+    {
+      "t": 26.19,
+      "rank": 10,
+      "pcm": "desc-10.pcm",
+      "text": "Bowl in hand",
+      "duration": 0.847,
+      "caused_by_viewer": false,
+      "why_ranked": "holds bowl, reacts to something unseen"
+    },
+    {
+      "t": 41.51,
+      "rank": 15,
+      "pcm": "desc-15.pcm",
+      "text": "Firelight on her",
+      "duration": 1.068,
+      "caused_by_viewer": false,
+      "why_ranked": "expression change only"
+    },
+    {
+      "t": 55.96,
+      "rank": 4,
+      "pcm": "desc-04.pcm",
+      "text": "She runs through a narrow alley of collapsed walls and scattered bricks. Something happens out of shot.",
+      "duration": 5.695,
+      "caused_by_viewer": false,
+      "why_ranked": "major location shift to ruined city"
+    },
+    {
+      "t": 67.6,
+      "rank": 1,
+      "pcm": "desc-01.pcm",
+      "text": "She grips a beam, glancing off at an unseen sound.",
+      "duration": 3.311,
+      "caused_by_viewer": false,
+      "why_ranked": "offscreen sound with no visible cause"
+    },
+    {
+      "t": 74.48,
+      "rank": 14,
+      "pcm": "desc-14.pcm",
+      "text": "She cradles a spiky brown fruit, then looks off.",
+      "duration": 2.992,
+      "caused_by_viewer": false,
+      "why_ranked": "object in hands, minor beat"
+    },
+    {
+      "t": 79.743,
+      "rank": 6,
+      "pcm": "desc-06.pcm",
+      "text": "She's up on the rooftops now, leaping off a wall into the alley.",
+      "duration": 3.433,
+      "caused_by_viewer": false,
+      "why_ranked": "location change, decisive action"
+    },
+    {
+      "t": 85.007,
+      "rank": 13,
+      "pcm": "desc-13.pcm",
+      "text": "She stops, watchful. A metal guard on her tattooed shoulder.",
+      "duration": 4.225,
+      "caused_by_viewer": false,
+      "why_ranked": "she stops running, character detail"
+    },
+    {
+      "t": 90.27,
+      "rank": 12,
+      "pcm": "desc-12.pcm",
+      "text": "Her mouth falls open, eyes fixed on something below her.",
+      "duration": 3.315,
+      "caused_by_viewer": false,
+      "why_ranked": "reaction shot before the discovery"
+    },
+    {
+      "t": 95.533,
+      "rank": 3,
+      "pcm": "desc-03.pcm",
+      "text": "A small winged dragon lies bleeding on the stones. She reaches a hand toward it.",
+      "duration": 4.787,
+      "caused_by_viewer": false,
+      "why_ranked": "key reveal of wounded dragon"
+    },
+    {
+      "t": 100.797,
+      "rank": 11,
+      "pcm": "desc-11.pcm",
+      "text": "The hand reaches closer.",
+      "duration": 1.364,
+      "caused_by_viewer": false,
+      "why_ranked": "hand approaches the creature"
+    },
+    {
+      "t": 112.61,
+      "rank": 5,
+      "pcm": "desc-05.pcm",
+      "text": "Indoors now, she cradles the creature, hand on its head.",
+      "duration": 3.486,
+      "caused_by_viewer": false,
+      "why_ranked": "move indoors, she has taken the creature"
+    },
+    {
+      "t": 118.95,
+      "rank": 2,
+      "pcm": "desc-02.pcm",
+      "text": "She smiles at the creature. Something off screen.",
+      "duration": 3.235,
+      "caused_by_viewer": false,
+      "why_ranked": "sound with no visible source"
+    },
+    {
+      "t": 123.23,
+      "rank": 16,
+      "pcm": "desc-16.pcm",
+      "text": "A gloved hand sweeps crumbs across a mat beside a stone bowl.",
+      "duration": 3.303,
+      "caused_by_viewer": false,
+      "why_ranked": "cutaway to hand, no story content"
+    }
+  ]
+}
