@@ -84,219 +84,219 @@
   "cues": [
     {
       "t": 9.98,
-      "rank": 2,
-      "pcm": "desc-02.pcm",
+      "rank": 1,
+      "pcm": "desc-01.pcm",
       "text": "Inside a tent",
       "duration": 0.993,
       "caused_by_viewer": false,
-      "why_ranked": "new location and character introduced"
+      "why_ranked": "major scene jump from body in snowfield to tent interior"
     },
     {
       "t": 14.82,
-      "rank": 6,
-      "pcm": "desc-06.pcm",
-      "text": "A red-haired girl lies bound nearby.",
-      "duration": 2.204,
+      "rank": 7,
+      "pcm": "desc-07.pcm",
+      "text": "A red-haired girl watches.",
+      "duration": 1.559,
       "caused_by_viewer": false,
-      "why_ranked": "establishes the girl in the tent"
+      "why_ranked": "establishes who she is with the robed man"
+    },
+    {
+      "t": 23.7,
+      "rank": 15,
+      "pcm": "desc-15.pcm",
+      "text": "A hand reaches",
+      "duration": 0.979,
+      "caused_by_viewer": false,
+      "why_ranked": "she reaches toward the old man's hands"
     },
     {
       "t": 41.51,
-      "rank": 22,
-      "pcm": "desc-22.pcm",
-      "text": "A noise off-screen.",
-      "duration": 1.179,
+      "rank": 21,
+      "pcm": "desc-21.pcm",
+      "text": "Something off screen.",
+      "duration": 1.142,
       "caused_by_viewer": false,
-      "why_ranked": "close-up, little new information"
+      "why_ranked": "she is simply alone in same scene"
     },
     {
       "t": 55.96,
-      "rank": 3,
-      "pcm": "desc-03.pcm",
-      "text": "She runs alone down a narrow alley heaped with rubble. Something happens out of sight.",
-      "duration": 4.953,
+      "rank": 5,
+      "pcm": "desc-05.pcm",
+      "text": "She runs alone down a narrow alley strewn with fallen bricks and collapsed timber.",
+      "duration": 4.463,
       "caused_by_viewer": false,
-      "why_ranked": "story moves to ruined alley"
+      "why_ranked": "moves story to ruined alley, she is running"
     },
     {
       "t": 61.78,
       "rank": 24,
       "pcm": "desc-24.pcm",
-      "text": "She scrambles over the rubble toward a boarded door. Something sounds off in the distance.",
-      "duration": 4.842,
+      "text": "A blade strapped to her back, she clambers over the bricks, heading deeper into the alley.",
+      "duration": 4.81,
       "caused_by_viewer": false,
-      "why_ranked": "camera push-in on same action"
+      "why_ranked": "camera move only, no new information"
     },
     {
       "t": 67.6,
-      "rank": 21,
-      "pcm": "desc-21.pcm",
-      "text": "In a grey vest and fingerless gloves, she braces against a leaning beam.",
-      "duration": 4.213,
+      "rank": 23,
+      "pcm": "desc-23.pcm",
+      "text": "She's young, hair cropped short, pale tank top, fingerless gloves.",
+      "duration": 4.507,
       "caused_by_viewer": false,
-      "why_ranked": "closer framing on a beam grip"
+      "why_ranked": "closer framing revealing costume detail"
     },
     {
       "t": 74.48,
-      "rank": 14,
-      "pcm": "desc-14.pcm",
-      "text": "She cups a spiky green fruit, then looks off toward a noise.",
-      "duration": 3.545,
+      "rank": 18,
+      "pcm": "desc-18.pcm",
+      "text": "She uncovers a knobbled dark fruit, holding it in both hands, glancing aside.",
+      "duration": 4.959,
       "caused_by_viewer": false,
-      "why_ranked": "she takes a fruit"
+      "why_ranked": "she holds a fruit, minor beat"
     },
     {
       "t": 79.743,
-      "rank": 12,
-      "pcm": "desc-12.pcm",
-      "text": "She's up on the rooftops now, leaping across a narrow alley below.",
-      "duration": 3.852,
+      "rank": 17,
+      "pcm": "desc-17.pcm",
+      "text": "She's up on the rooftops now, leaping from a ledge between buildings.",
+      "duration": 3.812,
       "caused_by_viewer": false,
-      "why_ranked": "she leaps between rooftops"
+      "why_ranked": "she is now up on the rooftops"
     },
     {
       "t": 85.007,
-      "rank": 18,
-      "pcm": "desc-18.pcm",
-      "text": "She stops, brow furrowed. An armoured guard on her shoulder.",
-      "duration": 4.02,
+      "rank": 22,
+      "pcm": "desc-22.pcm",
+      "text": "She lands, frowning. A metal guard straps her tattooed shoulder.",
+      "duration": 4.355,
       "caused_by_viewer": false,
-      "why_ranked": "landing plus armor and tattoo detail"
+      "why_ranked": "cut to her face, only shows tattoo"
     },
     {
       "t": 90.27,
-      "rank": 16,
-      "pcm": "desc-16.pcm",
-      "text": "Her mouth falls open, eyes fixed downward on the collapsed creature.",
-      "duration": 3.883,
+      "rank": 4,
+      "pcm": "desc-04.pcm",
+      "text": "She stares down at the collapsed creature, lips parting, alarm crossing her face.",
+      "duration": 4.884,
       "caused_by_viewer": false,
-      "why_ranked": "reaction to something below"
+      "why_ranked": "her reaction motivates looking down at what follows"
     },
     {
       "t": 95.533,
-      "rank": 4,
-      "pcm": "desc-04.pcm",
-      "text": "A small winged creature lies on the stones, wing bloodied. Her hand reaches out.",
-      "duration": 5.026,
+      "rank": 2,
+      "pcm": "desc-02.pcm",
+      "text": "The small winged dragon lies bleeding on the stones. Her hand reaches toward it.",
+      "duration": 4.769,
       "caused_by_viewer": false,
-      "why_ranked": "wounded dragon revealed"
+      "why_ranked": "reveals the wounded dragon, the film's central discovery"
     },
     {
       "t": 100.797,
-      "rank": 19,
-      "pcm": "desc-19.pcm",
-      "text": "The open hand reaches closer. The dragon flinches.",
-      "duration": 3.455,
+      "rank": 11,
+      "pcm": "desc-11.pcm",
+      "text": "The dragon stays put. The outstretched hand waits, unanswered.",
+      "duration": 4.177,
       "caused_by_viewer": false,
-      "why_ranked": "hand nears dragon, small progression"
+      "why_ranked": "her hand reaching, dragon holds still"
     },
     {
       "t": 112.61,
-      "rank": 5,
-      "pcm": "desc-05.pcm",
-      "text": "Indoors now. She pins the dragon down, hand on its head.",
-      "duration": 3.986,
+      "rank": 3,
+      "pcm": "desc-03.pcm",
+      "text": "Indoors now, she holds the creature down. Something sounds off screen.",
+      "duration": 4.661,
       "caused_by_viewer": false,
-      "why_ranked": "indoors, someone restrains the dragon"
+      "why_ranked": "location shift indoors with her holding the bleeding creature"
     },
     {
       "t": 118.95,
-      "rank": 1,
-      "pcm": "desc-01.pcm",
-      "text": "The creature calms. She smiles. A noise elsewhere.",
-      "duration": 4.058,
+      "rank": 6,
+      "pcm": "desc-06.pcm",
+      "text": "She cradles the creature, smiling at it.",
+      "duration": 2.57,
       "caused_by_viewer": false,
-      "why_ranked": "off-screen sound with no visible cause"
+      "why_ranked": "creature now healed and small, time has passed"
     },
     {
       "t": 123.23,
-      "rank": 15,
-      "pcm": "desc-15.pcm",
-      "text": "The bowl she sets on the woven mat is empty.",
-      "duration": 2.302,
+      "rank": 20,
+      "pcm": "desc-20.pcm",
+      "text": "Her gloved hand sweeps crumbs across a mat toward a stone bowl.",
+      "duration": 3.213,
       "caused_by_viewer": false,
-      "why_ranked": "gloved hand and empty bowl"
+      "why_ranked": "close detail of crumbs and bowl"
     },
     {
       "t": 129.68,
-      "rank": 13,
-      "pcm": "desc-13.pcm",
-      "text": "In a dim room, a figure lies on a low bed; someone stands over them.",
-      "duration": 4.444,
+      "rank": 14,
+      "pcm": "desc-14.pcm",
+      "text": "A dim room: someone in dark clothes stands over a low bed with pink covers.",
+      "duration": 4.573,
       "caused_by_viewer": false,
-      "why_ranked": "widens to show the dim sickroom"
+      "why_ranked": "shift to dim interior with a figure by a bed"
     },
     {
       "t": 134.788,
-      "rank": 7,
-      "pcm": "desc-07.pcm",
-      "text": "She lies asleep, the figure beside her masked.",
-      "duration": 2.852,
+      "rank": 10,
+      "pcm": "desc-10.pcm",
+      "text": "She sleeps curled on the bed, blanket drawn over her.",
+      "duration": 3.034,
       "caused_by_viewer": false,
-      "why_ranked": "reveals sleeping woman and attendant figure"
-    },
-    {
-      "t": 139.895,
-      "rank": 23,
-      "pcm": "desc-23.pcm",
-      "text": "From above, someone watches her sleep through hanging laundry and rope.",
-      "duration": 3.764,
-      "caused_by_viewer": false,
-      "why_ranked": "camera angle change only"
+      "why_ranked": "reveals a woman asleep, new situation"
     },
     {
       "t": 145.002,
-      "rank": 11,
-      "pcm": "desc-11.pcm",
-      "text": "A large lizard creature sniffs at someone's outstretched hand.",
-      "duration": 3.174,
+      "rank": 8,
+      "pcm": "desc-08.pcm",
+      "text": "Elsewhere, hands feed the creature from a leather pouch.",
+      "duration": 3.136,
       "caused_by_viewer": false,
-      "why_ranked": "new creature beside a person"
+      "why_ranked": "creature has grown large, she feeds it"
     },
     {
       "t": 152.08,
-      "rank": 8,
-      "pcm": "desc-08.pcm",
-      "text": "Outside now, she walks a crate-lined street, past an armed figure standing guard.",
-      "duration": 4.981,
+      "rank": 9,
+      "pcm": "desc-09.pcm",
+      "text": "Outside now, she hurries along a crate-lined street, passing a tall armed figure.",
+      "duration": 5.022,
       "caused_by_viewer": false,
-      "why_ranked": "move outside to a guarded street"
+      "why_ranked": "story moves to a sunlit street"
     },
     {
       "t": 158.31,
-      "rank": 10,
-      "pcm": "desc-10.pcm",
-      "text": "A busy market alley. A bald man and a blonde woman watch her from behind a fence.",
-      "duration": 4.88,
+      "rank": 12,
+      "pcm": "desc-12.pcm",
+      "text": "A bald man and a blonde woman watch her weave off through the crowded market stalls.",
+      "duration": 4.027,
       "caused_by_viewer": false,
-      "why_ranked": "crowded market and watchers established"
+      "why_ranked": "introduces two people watching her"
     },
     {
       "t": 166.51,
-      "rank": 17,
-      "pcm": "desc-17.pcm",
-      "text": "She stares off past us, lips parted, at something out of sight.",
-      "duration": 4.036,
+      "rank": 13,
+      "pcm": "desc-13.pcm",
+      "text": "She turns sharply, eyes wide, toward something out of sight.",
+      "duration": 3.644,
       "caused_by_viewer": false,
-      "why_ranked": "reaction to something off screen"
+      "why_ranked": "her surprise signals something offscreen"
     },
     {
       "t": 172.79,
-      "rank": 9,
-      "pcm": "desc-09.pcm",
-      "text": "She grins upward. Something small sails through the air overhead, thrown from out of shot.",
-      "duration": 5.383,
+      "rank": 16,
+      "pcm": "desc-16.pcm",
+      "text": "Outside under sailcloth awnings, she grins upward. Something small drops through the air.",
+      "duration": 5.707,
       "caused_by_viewer": false,
-      "why_ranked": "feather falling is the revealed detail"
+      "why_ranked": "outdoors, something falls toward her"
     },
     {
       "t": 178.72,
-      "rank": 20,
-      "pcm": "desc-20.pcm",
-      "text": "She's back on the cobbled street now, smiling faintly, washing baskets and barrels behind her.",
-      "duration": 5.328,
+      "rank": 19,
+      "pcm": "desc-19.pcm",
+      "text": "She's back down in a sunlit cobbled street, baskets and barrels behind her, smiling faintly.",
+      "duration": 5.929,
       "caused_by_viewer": false,
-      "why_ranked": "faint smile, minor beat"
+      "why_ranked": "another street shot, little new"
     }
   ]
 }
