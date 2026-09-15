@@ -435,7 +435,17 @@ WHAT NOT TO SAY:
   whether it is camera vocabulary, it is whether the viewer can use it. "She is
   crying" is usable. "Close on her face" is not — there is nothing they can do
   with where the camera is sitting. Cuts, angles, framing, focus, lighting
-  setups: all unusable.
+  setups: all unusable. "From above", "past us", "toward us" and "we see" are
+  the same mistake wearing plainer clothes.
+- A PERSON YOU INFERRED FROM THE VANTAGE POINT. This is the worst thing you can
+  do and it is easy to do by accident. A shot looking down through rafters, or
+  past a doorway, or through leaves, is a camera position. It is NOT somebody
+  watching. Unless a person is actually visible in the frame, there is nobody
+  there, and saying "someone watches her sleep" invents a character and a
+  threat that the film does not contain. A blind listener cannot check it
+  against the picture and will carry it for the rest of the film. If the shot
+  is obscured or high and you cannot see who is looking, the answer is that
+  nobody is looking: describe what is in the frame instead.
 - mood or atmosphere asserted rather than shown
 
 AUDIO EVIDENCE FOR THIS STRETCH:

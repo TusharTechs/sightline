@@ -100,7 +100,30 @@ def check(bundle, gaps_path=None):
             else:
                 first_seen[head] = c["t"]
 
-    # 5. Repeated phrases across the run.
+    # 5. Camera language.
+    #
+    # Describing where the camera sits gives a listener nothing they can use.
+    # Worse, a vantage point gets mistaken for a person: one description of a
+    # high shot looking down through rafters said "someone watches her sleep",
+    # inventing a character and a threat the film does not contain. A listener
+    # asked what that shot was, trying to reconcile it, which is how it was
+    # found.
+    #
+    # "off screen" and "out of shot" are deliberately NOT flagged. Naming an
+    # unseen source of a sound is the correct thing to say and the prompt asks
+    # for it.
+    camera = re.compile(
+        r"\b(from above|from below|the camera|pans?|panning|zooms?|close[- ]up|"
+        r"cuts? to|we see|past us|toward us|at us|the shot|in frame|"
+        r"camera angle|framing)\b", re.I)
+    for c in cues:
+        d = c.get("description") or c.get("text", "")
+        m = camera.search(d)
+        if m:
+            fails.append(f'{c["t"]}s uses camera language: "{m.group(0)}" in '
+                         f'"{d}"')
+
+    # 6. Repeated phrases across the run.
     grams = Counter()
     for c in cues:
         w = re.findall(r"[a-z']+", (c.get("description") or c.get("text","")).lower())
