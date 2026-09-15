@@ -24,3 +24,6 @@ outreach/
 
 # Submission working drafts — local reference only
 submission/
+
+# Local editor settings, not part of the project
+.vscode/
