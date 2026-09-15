@@ -14,7 +14,7 @@ it. The word budget comes from the gap, at the playback rate, exactly as before.
 import argparse, json, os, subprocess, sys, tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from salience import describe_film_change, onset_has_visible_cause
+from salience import describe_film_change, onset_has_visible_cause, make_continuous
 from speech import budget_words, synthesize
 from audio_events import analyse, describe_for_prompt, worth_checking
 
@@ -208,6 +208,30 @@ def main():
     for m in log:
         if m:
             print(f"  {m}", file=sys.stderr)
+
+    # Pass 3. Every description above was written looking only at its own
+    # moment, in parallel, knowing nothing of what any other line said. Over a
+    # stretch of film that shows: a woman established as "she" is met again six
+    # lines later as "a tattooed woman", the same bloodied wing is reported
+    # twice, and a character's gender can flip between shots. A blind reviewer
+    # put it as the descriptions not drawing a line through the film, and this
+    # is one concrete part of that.
+    #
+    # One call, repairing only how things are referred to. It may not add,
+    # embellish or re-describe, and any line it lengthens past the budget its
+    # audio has to fit is discarded in favour of the original.
+    if len(cues) > 1:
+        budgets = [c["word_budget"] for c in cues]
+        before = [c["description"] for c in cues]
+        after = make_continuous(before, budgets, a.backend, a.effort)
+        changed = 0
+        for c, old, new in zip(cues, before, after):
+            if new != old:
+                changed += 1
+                print(f"  [cont] {old}\n     ->  {new}", file=sys.stderr)
+                c["description"] = new
+        print(f"  continuity pass: {changed} of {len(cues)} lines adjusted",
+              file=sys.stderr)
 
     json.dump({"media": a.media, "rate": a.rate, "count": len(cues), "cues": cues},
               open(a.out, "w"), indent=2)
