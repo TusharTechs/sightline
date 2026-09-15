@@ -233,8 +233,27 @@
     return s;
   }
 
+  // Watching it a second time should describe it a second time.
+  //
+  // Cues were marked spent for the life of the page, so replaying the film
+  // played it silently: every description had already been used up, and only
+  // reloading brought them back. Reported by a listener who did exactly what
+  // anyone would do, which is watch it again.
+  //
+  // Any jump backwards -- replay, scrub, or the film ending and starting over
+  // -- releases every cue at or after the new position. Cues before it stay
+  // spent, so scrubbing back a little does not replay the whole film at you.
+  let cueClock = 0;
+  function rewindCues(t) {
+    for (const cue of timeline.cues) {
+      if (cue.t >= t - 0.25) played.delete(cue.rank);
+    }
+  }
+
   function fireCues(t) {
     if (!timeline) return;
+    if (t < cueClock - 0.5) rewindCues(t);
+    cueClock = t;
     for (const cue of timeline.cues) {
       if (played.has(cue.rank) || cue.t > t) continue;
       if (t - cue.t < 4) {
@@ -317,10 +336,12 @@
     }
 
     if (timeline) {
+      // Same rule in follow mode: if the television went back, so do we.
+      if (t < cueClock - 0.5) rewindCues(t);
+      cueClock = t;
       for (const cue of timeline.cues) {
         if (!played.has(cue.rank) && cue.t <= t && t - cue.t < 4) {
-          played.add(cue.rank);
-          play(cue);
+          if (play(cue)) played.add(cue.rank);
         }
       }
     }
