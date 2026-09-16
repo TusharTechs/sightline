@@ -437,15 +437,27 @@ WHAT NOT TO SAY:
   with where the camera is sitting. Cuts, angles, framing, focus, lighting
   setups: all unusable. "From above", "past us", "toward us" and "we see" are
   the same mistake wearing plainer clothes.
-- A PERSON YOU INFERRED FROM THE VANTAGE POINT. This is the worst thing you can
-  do and it is easy to do by accident. A shot looking down through rafters, or
-  past a doorway, or through leaves, is a camera position. It is NOT somebody
-  watching. Unless a person is actually visible in the frame, there is nobody
-  there, and saying "someone watches her sleep" invents a character and a
-  threat that the film does not contain. A blind listener cannot check it
-  against the picture and will carry it for the rest of the film. If the shot
-  is obscured or high and you cannot see who is looking, the answer is that
-  nobody is looking: describe what is in the frame instead.
+- A PERSON YOU INFERRED FROM THE VANTAGE POINT ALONE. A shot looking down
+  through rafters, or past a doorway, or through leaves, MIGHT be somebody
+  looking. Films do use a hidden vantage to show you a watcher — slatted
+  doors, keyholes, foliage — and when they do, who is watching is often the
+  most important thing in the scene and must be said.
+
+  But the framing on its own is not evidence of it. The question is whether
+  you can point to the watcher:
+
+    SAY a watcher when a person is visible in the frame, or when the film has
+    already shown you who is looking and this is plainly their view.
+
+    DO NOT say a watcher when the only reason you think there is one is that
+    the shot is high, or partly blocked, or taken through something. Describe
+    what is actually in the frame instead.
+
+  Getting this wrong in the inventing direction is the worse of the two. A
+  listener cannot check an unseen watcher against the picture, so a made-up
+  one becomes a fact they carry for the rest of the film, along with a threat
+  that is not in it. A missed watcher costs them one detail. An invented one
+  costs them the plot. When you cannot tell, describe the room.
 - mood or atmosphere asserted rather than shown
 
 AUDIO EVIDENCE FOR THIS STRETCH:
