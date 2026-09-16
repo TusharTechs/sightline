@@ -431,6 +431,7 @@ WHAT NOT TO SAY:
 - anything the soundtrack already explained on its own — a door, footsteps,
   someone crying. Those sounds account for themselves and the viewer has them.
 - anything the dialogue already said
+{camera_rule}
 - anything that describes the FILMING rather than the film. The test is not
   whether it is camera vocabulary, it is whether the viewer can use it. "She is
   crying" is usable. "Close on her face" is not — there is nothing they can do
@@ -467,8 +468,39 @@ You have room for AT MOST {max_words} words. Hard limit, short on purpose —
 this has to fit between lines of dialogue. Present tense. Plain."""
 
 
+# Whether to describe the filmmaking is a preference, not a fact, and two
+# blind reviewers gave opposite answers within a week of each other.
+#
+# One was unambiguous that camera vocabulary is useless: "there is nothing they
+# can do with where the camera is sitting". The other, asked about a high shot,
+# wanted to know why the scene was shot that way -- "I even though blind
+# understand and enjoy directors having their own styles of film making."
+#
+# Both are right about themselves, and the research says so too: studies
+# comparing a standard style against a "cinematic" one that names camera work
+# found most blind and partially sighted participants responded positively to
+# the cinematic style, and that it increased their sense of presence.
+#
+# So this is a setting. The default stays plain, because a listener who does
+# not want it gets nothing usable from it and it costs words that could have
+# carried the story. Anyone who does want it can ask.
+PLAIN_CAMERA = """- anything about where the camera is or what it is doing.
+  "Close on her face" is unusable; "she is crying" is what she needs. Cuts,
+  angles, framing, focus and lighting setups are all in this category."""
+
+CINEMATIC_CAMERA = """- DO mention how a shot is made, but only when the
+  making of it is doing something the story needs and you can say so in a few
+  words. A held distance, a sudden closeness, a vantage the scene has not used
+  before: these are choices, and a listener who enjoys how films are put
+  together can use them. Two rules. Never spend words on the camera in place of
+  saying what is happening -- the event comes first and the shot second, and if
+  there is only room for one it is the event. And never describe an ordinary
+  shot; if the framing is unremarkable, say nothing about it at all."""
+
+
 def describe_film_change(before_png, after_png, max_words, dialogue="",
-                         backend="anthropic", audio_note="", effort=None):
+                         backend="anthropic", audio_note="", effort=None,
+                         cinematic=False):
     from pydantic import BaseModel, Field
 
     class FilmCue(BaseModel):
@@ -492,8 +524,9 @@ def describe_film_change(before_png, after_png, max_words, dialogue="",
         {"type": "text", "text": "NOW:"},
         {"type": "image", "source": {"type": "base64", "media_type": "image/png",
                                      "data": _b64(after_png)}},
-        {"type": "text", "text": FILM_PROMPT.format(audio_note=audio_note,
-                                                    max_words=max_words)},
+        {"type": "text", "text": FILM_PROMPT.format(
+            audio_note=audio_note, max_words=max_words,
+            camera_rule=CINEMATIC_CAMERA if cinematic else PLAIN_CAMERA)},
     ]
     kwargs = dict(
         max_tokens=16000,

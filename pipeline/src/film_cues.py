@@ -100,6 +100,11 @@ def main():
                         "that many cues, chosen by rank across the WHOLE "
                         "timeline rather than by taking the first N")
     p.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"])
+    p.add_argument("--cinematic", action="store_true",
+                   help="also describe how a shot is made when the making of "
+                        "it is doing something. Off by default: one reviewer "
+                        "finds camera vocabulary useless, another wants it, "
+                        "and they are each right about themselves")
     p.add_argument("--out", required=True)
     a = p.parse_args()
 
@@ -164,7 +169,8 @@ def main():
         note = describe_for_prompt(audio, spoken, checked)
 
         ask = max(a.min_words, int(budget * FIRST_ASK))
-        v = describe_film_change(before, after, ask, spoken, a.backend, note, a.effort)
+        v = describe_film_change(before, after, ask, spoken, a.backend, note,
+                                 a.effort, a.cinematic)
         if not (v["worth_saying"] and v["description"].strip()):
             return None, f"[skip] gap {g['start']:>6}-{g['end']:<6} {v['changed'][:52]}"
 
@@ -180,7 +186,8 @@ def main():
             over = meta["duration_s"] / avail
             want = max(a.min_words, int(len(text.split()) / over) - 1)
             text = describe_film_change(before, after, want, spoken,
-                                        a.backend, note, a.effort)["description"]
+                                        a.backend, note, a.effort,
+                                        a.cinematic)["description"]
         if meta and meta["duration_s"] > avail:
             return None, f"[drop] gap {g['start']} will not fit {avail:.2f}s"
 
