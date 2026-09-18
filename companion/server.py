@@ -15,7 +15,7 @@ The TV reports where it is in the media; the phone follows. The TV never has to
 listen on a socket, which is just as well since description generation already
 needs a service to live in.
 """
-import base64, json, os, struct, subprocess, sys, tempfile, threading, time
+import base64, json, os, re, struct, subprocess, sys, tempfile, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -59,6 +59,60 @@ def _run_stage(args, on_line=None):
     proc.wait()
     if proc.returncode != 0:
         raise RuntimeError(f"{os.path.basename(args[1])} failed")
+
+
+ALLOWED_SCHEMES = ("http", "https")
+MAX_FETCH_BYTES = 600 * 1024 * 1024
+
+
+def fetch_media(url, dest_dir):
+    """Download a video the viewer asked for, into the bundle.
+
+    The point of the whole project is content nobody has described, and until
+    now the only content it could describe was the file that shipped with it.
+    Someone who likes what it does to one clip immediately wants it pointed at
+    the thing they actually could not watch, and there was no way to do that.
+
+    Deliberately a direct media URL and nothing cleverer. No scraping, no
+    extracting from a site that did not offer the file: what the viewer may
+    fetch is their business and their right, and guessing at it on their
+    behalf is how a tool ends up doing something they would not have chosen.
+    """
+    import urllib.parse, urllib.request
+
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme not in ALLOWED_SCHEMES:
+        raise ValueError("only http and https URLs")
+
+    name = os.path.basename(parsed.path) or "added.mp4"
+    name = re.sub(r"[^A-Za-z0-9._-]", "_", name)[:80]
+    if not os.path.splitext(name)[1]:
+        name += ".mp4"
+    dest = os.path.join(dest_dir, name)
+
+    req = urllib.request.Request(url, headers={"User-Agent": "Sightline/1.0"})
+    with urllib.request.urlopen(req, timeout=60) as r, open(dest, "wb") as f:
+        got = 0
+        while True:
+            chunk = r.read(1 << 20)
+            if not chunk:
+                break
+            got += len(chunk)
+            if got > MAX_FETCH_BYTES:
+                f.close()
+                os.remove(dest)
+                raise ValueError("file is larger than 600 MB")
+            f.write(chunk)
+
+    # Confirm it is really video before spending a pipeline run on it.
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=codec_type", "-of", "csv=p=0", dest],
+        capture_output=True, text=True)
+    if "video" not in probe.stdout:
+        os.remove(dest)
+        raise ValueError("that URL is not a video file")
+    return name
 
 
 def generate(media_name):
@@ -322,7 +376,16 @@ class Handler(BaseHTTPRequestHandler):
             with GEN_LOCK:
                 if GEN["running"]:
                     return self._send(409, json.dumps({"error": "already running"}))
+            url = (data.get("url") or "").strip()
             media = data.get("media", "content.mp4")
+            if url:
+                # Fetch before claiming the run, so a bad URL fails fast and
+                # does not leave the UI waiting on a job that never starts.
+                try:
+                    media = fetch_media(url, BUNDLE)
+                except Exception as e:
+                    return self._send(400, json.dumps(
+                        {"error": f"could not fetch that: {str(e)[:120]}"}))
             # Reset synchronously, before the worker starts. The caller polls
             # immediately, and a stale "ready" from the previous run would send
             # it straight to playback of a description that no longer exists.
