@@ -128,22 +128,33 @@ def wav_header(nbytes, rate=48000, channels=2, bits=16):
             + b"data" + struct.pack("<I", nbytes))
 
 
-ANSWER_PROMPT = """A blind viewer is watching a film and has paused to ask you a
-question about what is on screen right now. The frame is attached.
+ANSWER_PROMPT = """A blind viewer is watching a film and has stopped to ask you
+a question. The frame they are on is attached, and below it is everything the
+film has given them so far: every line of dialogue that has been spoken, and
+every description they have heard.
 
 Their question: "{question}"
 
 Answer it. Nothing else.
 
-- Answer ONLY what was asked. Do not narrate the scene, do not set it up, do not
-  add what you think they might want next. They asked a question because the
-  description did not cover it; a second description is not an answer.
-- If the frame does not show the answer, say so plainly in a few words. Guessing
-  is worse than "I can't see that from here".
+- Use ALL of it. The answer may be in the frame, or in something said twenty
+  minutes ago, or in a description they heard earlier and have half forgotten.
+  A question like "what's the dagger about" is not answerable from a picture
+  and is answerable from the dialogue. Look everywhere before giving up.
+- Answer ONLY what was asked. Do not narrate the scene or set it up. They
+  asked because the description did not cover it; a second description is not
+  an answer.
+- NEVER go past the moment they are at. You can see the whole film; they
+  cannot. Anything that has not happened yet is a spoiler, and a viewer who
+  learns the ending from the help feature has been robbed of the film. If the
+  answer only exists later, say that it has not been explained yet.
+- If nothing you have answers it, say so plainly in a few words. "That hasn't
+  been explained yet" and "I can't see that from here" are both real answers.
+  Guessing is worse than either.
 - At most {max_words} words. Spoken aloud, present tense, plain.
-- Do not describe the filming — angles, framing, focus, lighting. Only what is
-  in the picture.
+- Do not describe the filming — angles, framing, focus, lighting.
 
+WHAT THEY HAVE HEARD SO FAR
 {context}"""
 
 
@@ -153,7 +164,53 @@ def _frame_at(media, t, out):
                    check=True)
 
 
-def answer_question(question, t, max_words=30):
+def dialogue_up_to(t):
+    """Every line of dialogue spoken before this moment, with its timing.
+
+    Read from the Transcribe result the pipeline already caches. Words are
+    grouped into lines on pauses, which is close enough to sentences to be
+    readable and does not need punctuation the transcript may not carry.
+    """
+    for path in (os.path.join(BUNDLE, "out", "transcript.json"),
+                 os.path.join(BUNDLE, "transcript.json")):
+        if os.path.exists(path):
+            break
+    else:
+        return []
+    try:
+        items = json.load(open(path))["results"]["items"]
+    except Exception:
+        return []
+
+    lines, cur, start, last = [], [], None, None
+    for it in items:
+        if it.get("type") != "pronunciation":
+            if cur:
+                cur[-1] += it["alternatives"][0]["content"]
+            continue
+        s0, e0 = float(it["start_time"]), float(it["end_time"])
+        if s0 > t:
+            break
+        if last is not None and s0 - last > 1.2 and cur:
+            lines.append((start, " ".join(cur)))
+            cur, start = [], None
+        if start is None:
+            start = s0
+        cur.append(it["alternatives"][0]["content"])
+        last = e0
+    if cur:
+        lines.append((start, " ".join(cur)))
+    return lines
+
+
+# 30 was the limit while answers came from a single frame, where there is not
+# much to say. With the dialogue and the description history in scope, a good
+# answer often needs to cite what was said and by whom -- "she calls the dragon
+# a kindred spirit, the stranger is the one calling her a hunter" does not fit
+# in 30 and is worth more than a shorter one. Measured answers to real
+# questions ran to about 35, so the stated limit is now one the model can
+# actually keep.
+def answer_question(question, t, max_words=45):
     """Look at the frame the viewer is on, and answer what they asked.
 
     This is the thing a pre-recorded description track structurally cannot do.
@@ -172,10 +229,33 @@ def answer_question(question, t, max_words=30):
         return {"error": "no timeline loaded"}
 
     media = os.path.join(BUNDLE, tl["media"])
-    said = [c["text"] for c in sorted(tl["cues"], key=lambda c: c["t"]) if c["t"] <= t]
-    context = ("Already described to them, so do not repeat it:\n"
-               + "\n".join(f"- {x}" for x in said[-4:])) if said else \
-              "Nothing has been described yet."
+
+    # Everything the viewer has been given, not just the last few lines.
+    #
+    # This used to pass the four most recent descriptions and one frame, which
+    # answers "what is on screen" and nothing else. A blind reviewer asked what
+    # the dagger was about and why a character was bound -- neither is in any
+    # frame, both are in dialogue from minutes earlier. The transcript and the
+    # full description history are already sitting on disk; not passing them
+    # was the only reason those questions could not be answered.
+    said = [c for c in sorted(tl["cues"], key=lambda c: c["t"]) if c["t"] <= t]
+    parts = []
+    if said:
+        parts.append("Descriptions they have heard, in order:\n"
+                     + "\n".join(f"  [{c['t']:.0f}s] {c['text']}" for c in said))
+    else:
+        parts.append("Nothing has been described yet.")
+
+    spoken = dialogue_up_to(t)
+    if spoken:
+        parts.append("Dialogue spoken so far, in order:\n"
+                     + "\n".join(f"  [{ts:.0f}s] {txt}" for ts, txt in spoken))
+    else:
+        parts.append("No dialogue has been spoken yet.")
+
+    parts.append(f"They are {t:.0f} seconds in. Nothing after this has "
+                 f"happened for them yet.")
+    context = "\n\n".join(parts)
 
     with tempfile.TemporaryDirectory() as td:
         png = os.path.join(td, "f.png")
