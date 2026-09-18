@@ -16,6 +16,7 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 [**▶ Live demo**](https://tushartechs.github.io/sightline/) &nbsp;·&nbsp;
 [**Watch it work**](#watch-it-work) &nbsp;·&nbsp;
 [**Try it yourself**](#try-it-without-a-fire-tv) &nbsp;·&nbsp;
+[**vs a phone app**](#what-this-does-that-a-phone-app-pointed-at-a-screen-does-not) &nbsp;·&nbsp;
 [**Architecture**](#architecture) &nbsp;·&nbsp;
 [**Evidence**](#evidence) &nbsp;·&nbsp;
 [**AWS**](#aws-integration) &nbsp;·&nbsp;
@@ -37,12 +38,40 @@ The quickest way to check this is real rather than described:
 | **that it works** | [the live demo](https://tushartechs.github.io/sightline/) — press play and listen |
 | **that it runs on the device** | [`app/`](app/) — a real Vega OS app; [`probes/`](probes/) shows what the platform would and would not do |
 | **that the numbers are real** | [Evidence](#evidence) — two of them reproduce with the commands given |
-| **that the design is not guesswork** | [Why it works this way](#how-we-knew-what-to-build) — the rules came from a blind accessibility professional, quoted directly |
+| **that the design is not guesswork** | [Why it works this way](#how-we-knew-what-to-build) — two blind reviewers, quoted directly, including the six faults one of them found |
+| **that it works on a real story** | [three minutes of the film](https://tushartechs.github.io/sightline/film/) — the trailer withholds its story by design; this does not |
+| **where it does NOT work** | [`docs/where-it-works.md`](docs/where-it-works.md) — measured. An advert produces zero descriptions |
+| **what the platform cost us** | [`FRICTION-LOG.md`](FRICTION-LOG.md) — 15 findings from building on Vega, written while building |
 | **what we learned about Vega** | [`FRICTION-LOG.md`](FRICTION-LOG.md) (15 entries) and [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) |
 | **what is not finished** | [`STATUS.md`](STATUS.md) — kept honest, including what no blind user has tested yet |
 
 **Fastest check of all:** [tushartechs.github.io/sightline](https://tushartechs.github.io/sightline/) — press play and listen. Nothing to
 install. The submission video is not made yet.
+
+## What this does that a phone app pointed at a screen does not
+
+Apps exist that will describe an image or a video on a phone. This is a
+different thing in four ways, and the combination is the point:
+
+- **It runs on the television**, not on a second device held up to one. The
+  description comes out of the same speakers as the film, on a Fire Stick.
+- **It fits the gaps.** Description is placed where nobody is speaking and
+  measured to fit before it is spoken, so it never talks over the dialogue.
+  That requires knowing where the dialogue is, which is why Transcribe is in
+  the pipeline rather than a silence detector.
+- **It survives a speed change.** Ranking is fixed once, host-side. At 2x you
+  hear less of the same story in the same order, never a different story — a
+  rule a blind reviewer gave us and the single hardest constraint in here.
+- **It can be interrupted.** A question about the frame on screen right now is
+  answered from that frame. No pre-rendered description track can do this,
+  because the question does not exist when the track is made.
+
+And one thing it does that nothing else seems to: **the description can go to
+one person's phone while the room hears the film untouched.** A blind viewer
+and a sighted viewer watching the same screen want different things, and
+every other approach makes one of them compromise.
+
+---
 
 ## In thirty seconds
 
@@ -94,10 +123,32 @@ install — the same timeline and the same generated audio that the Fire TV app
 uses, driving a plain web page. About 6 MB, so it starts quickly on mobile data.
 
 Built for a screen reader: large targets, one primary action, semantic
-landmarks, and an `aria-live` region that announces state.
+landmarks, and live regions that announce state changes without reading the
+clock aloud. Several of those details are there because a blind reviewer
+reported the earlier versions doing the wrong thing.
 
-*Asking questions is not available on the hosted version — answers are generated
-live and need a server. Run it locally for that.*
+**Two more things worth opening, both linked from that page:**
+
+### ▶ [/film/](https://tushartechs.github.io/sightline/film/) — three minutes of the actual film
+
+The clip above is a trailer, and a trailer withholds its story deliberately.
+A blind reviewer pointed out that made it a poor test: *"is it possible that
+the information isn't enough to draw a line through it?"* This is the film
+itself, where the story is present and the description can be judged on
+whether it conveys one.
+
+### ▶ [/listen/](https://tushartechs.github.io/sightline/listen/) — can you hear what the machine hears?
+
+Nineteen clips, scored in your browser, no data collected. Deciding whether a
+noise is an event worth describing or just the score swelling was the hardest
+problem in here; this is the test of whether the distinction is audible to a
+listener at all. Three clips are played twice to measure your own consistency,
+because a machine that changes its mind is only unreliable if it does so more
+often than a person.
+
+*Asking questions is not available on the hosted pages — answers are generated
+from the frame on screen and need a server. The hosted page says so where the
+feature would be, rather than hiding it. Run it locally for that.*
 
 ### Running the whole thing locally
 
@@ -195,9 +246,12 @@ is now decided once and speed only changes how far down the list you get.
 
 ## How we knew what to build
 
-Almost every design decision here came from correspondence with a blind
-accessibility professional on the ACB Audio Description Project mailing list —
-not from our guesses about what blind viewers want.
+Almost every design decision here came from correspondence with blind
+reviewers on the ACB Audio Description Project mailing list — not from guesses
+about what blind viewers want. Two of them, and they did different jobs.
+
+**A blind accessibility professional** set the description rules, and kept
+correcting them long after they looked settled:
 
 > **"A walkthrough needs you to describe what changed, not what's there.
 > The information lives in the difference between two moments."**
@@ -221,8 +275,49 @@ not from our guesses about what blind viewers want.
 > **"It isn't that it's camera language. It's that I can't use it."**
 > → the ban is a usability test, not a vocabulary list.
 
-The full exchange, including the four corrections that changed the
-architecture, is in [`HANDOFF.md`](HANDOFF.md) and [`outreach/`](outreach/).
+> **"A swell and a hit are different shapes, not different sizes. Measure how
+> fast the level got there rather than how far it got."**
+> → onset detection measures attack and decay, not magnitude. Following his
+> next correction — measure the fall against the level *before* the onset, not
+> against the peak — separated hits from swells cleanly, and the perturbation
+> test he then insisted on found a bug in the audio **loader**: it was reading
+> 16-bit and clipping every file, turning impacts into swells before the rule
+> ever saw them.
+
+**Dave Matters** used the player and found what no amount of local testing
+had:
+
+> **"It goes well until just after the 2 minute mark. I get no further
+> description after that."**
+> → a limit meant to cap how many descriptions get written was truncating the
+> film instead. On a feature it would have described the first minute and gone
+> silent for the remaining thirteen. Invisible on a 52-second trailer, which
+> is all that had ever been tested.
+
+> **"The description was drown out by the video volume."**
+> → `volume` is read-only on iOS, so ducking silently did nothing on exactly
+> the devices most likely to be running a screen reader. The film now routes
+> through a gain node.
+
+> **"VO repeating things over and over… even when returning to the homescreen."**
+> → a live region rewritten four times a second, and a transcript that
+> prepended each new line so the reader's cursor was shoved out from under it.
+
+> **"Is that a pan up to that perspective kind of shot? Just trying to
+> construct it in my head."**
+> → there was nobody there. A high shot through rafters had been described as
+> "someone watches her sleep". It had turned a camera angle into a person, and
+> a listener cannot check an invented character against the picture.
+
+[`pipeline/src/preflight.py`](pipeline/src/preflight.py) now fails a clip
+before anyone hears it, for each class of fault above that can be detected
+mechanically.
+
+**They disagreed about one thing**, which is why it is a setting rather than a
+rule: whether to describe the filmmaking. One said camera vocabulary is
+unusable; the other enjoys directorial style and wanted it. The research finds
+most blind and partially sighted viewers prefer the cinematic style, so
+`--cinematic` exists and is off by default.
 
 ---
 
@@ -233,7 +328,7 @@ architecture, is in [`HANDOFF.md`](HANDOFF.md) and [`outreach/`](outreach/).
 | Finds the moments something changed | **9/9** ground-truth changes, **0** false positives |
 | Applies the salience rule correctly | precision **1.00**, recall **1.00** |
 | Fits descriptions to the gap at speed | verified by synthesis at 1x, 1.5x, 2x — nothing time-compressed |
-| Finds describable time in real film | **42.9s** of a 52s trailer, vs 2.5s by silence detection |
+| Finds describable time in real film | **39.8s** of a 52s trailer, vs 2.5s by silence detection |
 | Plays video on Fire TV | MSE reaches `canplay` → `playing`, audio audible |
 | Plays description concurrently | PCM on an accessibility stream, ducking confirmed |
 
@@ -395,8 +490,18 @@ Kept current in [`STATUS.md`](STATUS.md). The ones worth knowing before you judg
 - **Description is generated ahead of playback**, not live as you watch.
   Questions *are* answered live. Generating once for content nobody will ever
   describe by hand is the design; we would rather say so than imply otherwise.
-- **No blind user has operated the app yet.** The design is grounded in
-  correspondence, not in observed use.
+- **Blind reviewers have used the web player, not the Fire TV app.** They
+  found six faults in it, all fixed. The pipeline faults among them — the
+  truncated timeline, the invented character — affect the television app
+  equally, because it is the same generated description. The iOS-specific ones
+  do not. Nobody blind has operated the app on a television.
+- **It describes what it is left room to describe.** Measured across three
+  content types in [`docs/where-it-works.md`](docs/where-it-works.md): an
+  advert produces zero descriptions, because it fills every second it paid
+  for. Gap-filling has a floor and this is where it is.
+- **It does not understand the film.** It describes moments accurately and
+  does not connect them. A reviewer asked what the dagger meant; no amount of
+  better description answers that.
 - Answers take about 7 seconds.
 - Never run on physical Fire TV hardware — the virtual device only.
 
