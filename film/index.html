@@ -122,12 +122,9 @@
      there; an explained absence is honest and a silent one is not. -->
 <section id="askUnavailable" hidden aria-labelledby="askOffHead">
   <h2 id="askOffHead" class="sub" style="margin:22px 0 8px">Asking about this moment</h2>
-  <p class="sub">Sightline can be interrupted with a question while the film
-  runs — "who else is in this room?" — and answers from the frame on screen at
-  that second. That needs a service looking at the video, so it cannot run on
-  this static page, which is served as files with nothing behind it.
-  It is <a href="https://github.com/TusharTechs/sightline/blob/main/companion/server.py">in
-  the repository</a> and runs against a Fire TV or a local copy.</p>
+  <p class="sub">Asking is temporarily unreachable. The answer is generated
+  from the frame on screen at that second, so it needs the service to
+  respond; the description itself keeps playing regardless.</p>
 </section>
 
 <section id="askSection" hidden aria-labelledby="askHead">
@@ -439,23 +436,12 @@
       // Route before the first play, while we are still inside the gesture
       // that unlocked the context.
       routeFilm();
-      // Answers are generated live against the current frame, so they need a
-      // service. Offer the button only where one is actually reachable rather
-      // than letting someone press something that cannot work.
-      try {
-        const probe = await fetch('ask', {method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({question: '', t: 0})});
-        // Our service answers 400 to an empty question; static hosting gives
-        // 404, 403 or 501 depending on the host. Show the button only for the
-        // former — the earlier test was inverted and would have hidden it
-        // exactly where it works.
-        askSection.hidden = !(probe.status === 200 || probe.status === 400);
-      } catch {
-        askSection.hidden = true;
-      }
-      // Whichever way that went, do not leave the capability unexplained.
-      el('askUnavailable').hidden = !askSection.hidden;
+      // Asking works everywhere now. There is a hosted answerer behind the
+      // page, so this no longer has to be hidden when no local service is
+      // running -- which was the case for everybody who opened the public
+      // link, meaning the feature existed for nobody it was built for.
+      askSection.hidden = false;
+      el('askUnavailable').hidden = true;
       say('Playing with description.');
       try { await film.play(); } catch { say('Press play on the video.'); }
     } else {
@@ -494,18 +480,53 @@
   // Interactive description. The Fire TV has no app-level speech recognition,
   // so a spoken question can only ever begin on this device — which is the
   // reason the companion channel had to exist before this could.
+  // Two answerers, and the page does not care which it gets.
+  //
+  // A local service is preferred when one is running: it is on the same
+  // machine as the film and can pull any frame out of it. When there is not
+  // one -- which is the case for everybody who opens the public link -- the
+  // question goes to a hosted endpoint instead, which reads a pre-extracted
+  // frame and the transcript from this same site.
+  //
+  // Without the second path the feature existed only for whoever had the
+  // repository checked out, which is nobody this was built for.
+  const HOSTED_ASK = 'https://s4i9xx7htg.execute-api.us-east-1.amazonaws.com';
+
+  // Which clip this copy of the page is showing, from the directory it sits
+  // in. The hosted answerer needs to know which film to read.
+  function videoId() {
+    const parts = location.pathname.split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    return (last === 'film' || last === 'duck') ? last : '';
+  }
+
+  async function askLocal(question) {
+    const res = await fetch('ask', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question, t: lastT}),
+    });
+    if (!res.ok) throw new Error('local unavailable');
+    return res.json();
+  }
+
+  async function askHosted(question) {
+    const res = await fetch(HOSTED_ASK, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question, t: lastT, video: videoId()}),
+    });
+    return res.json();
+  }
+
   async function ask(question) {
     answerBox.hidden = false;
     answerText.textContent = 'Asking…';
     answerMeta.textContent = question;
     say('Asking.');
     try {
-      const res = await fetch('ask', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({question, t: lastT}),
-      });
-      const a = await res.json();
+      let a;
+      try { a = await askLocal(question); }
+      catch { a = await askHosted(question); }
+
       if (a.error) {
         answerText.textContent = 'Could not answer.';
         answerMeta.textContent = a.error;
@@ -513,10 +534,24 @@
       }
       answerText.textContent = a.answer;
       answerMeta.textContent = `asked at ${a.asked_at}s`;
-      // Announce immediately — a blind user should not wait on the audio
-      // fetch to know the answer arrived.
+      // Announce immediately. A blind listener should not have to wait on an
+      // audio download to know the answer arrived.
       say(a.answer);
-      const buf = await (await fetch(a.audio)).arrayBuffer();   // answers stay wav; they are generated live
+
+      // The local service returns a URL to fetch; the hosted one returns the
+      // audio inline, because a second round trip on a phone is worse than a
+      // slightly larger reply.
+      let buf;
+      if (a.audio_mp3_b64) {
+        const bin = atob(a.audio_mp3_b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        buf = bytes.buffer;
+      } else if (a.audio) {
+        buf = await (await fetch(a.audio)).arrayBuffer();
+      } else {
+        return;                       // text arrived, speech did not; not fatal
+      }
       const decoded = await ctx.decodeAudioData(buf);
       const src = ctx.createBufferSource();
       src.buffer = decoded;
