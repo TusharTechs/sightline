@@ -11,7 +11,13 @@
     background: #0b0f14; color: #f2f5f8;
     font: 17px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
   }
-  h1 { font-size: 21px; margin: 0 0 2px; }
+  h1 { font-size: 21px; margin: 0; }
+  /* The mark sits beside the name, not instead of it. It carries no label and
+     is hidden from assistive technology: the <h1> next to it already says
+     "Sightline", and an SVG with its own title would have a screen reader
+     announce the name twice before the page has said anything useful. */
+  .brand { display: flex; align-items: center; gap: 11px; margin: 0 0 2px; }
+  .brand svg { flex: none; width: 30px; height: 30px; }
   .sub { color: #8797a8; font-size: 15px; margin-bottom: 20px; }
 
   /* Touch targets are deliberately large. This is operated without looking. */
@@ -47,7 +53,17 @@
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 
-<h1>Sightline</h1>
+<div class="brand">
+  <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <g fill="none" stroke="#f2f5f8" stroke-width="4.5" stroke-linecap="round">
+      <line x1="6" y1="32" x2="26" y2="32"/>
+      <path d="M32 20a16 16 0 0 1 0 24"/>
+      <path d="M40 14a26 26 0 0 1 0 36" opacity=".62"/>
+      <path d="M48 8a36 36 0 0 1 0 48" opacity=".32"/>
+    </g>
+  </svg>
+  <h1>Sightline</h1>
+</div>
 <p class="sub" id="tagline">Audio description for content that has none.</p>
 
 <!-- Standalone mode. Almost nobody evaluating this has a Fire TV, and a blind

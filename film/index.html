@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Sightline — three minutes of the film</title>
+<title>Sightline companion</title>
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
@@ -11,7 +11,13 @@
     background: #0b0f14; color: #f2f5f8;
     font: 17px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
   }
-  h1 { font-size: 21px; margin: 0 0 2px; }
+  h1 { font-size: 21px; margin: 0; }
+  /* The mark sits beside the name, not instead of it. It carries no label and
+     is hidden from assistive technology: the <h1> next to it already says
+     "Sightline", and an SVG with its own title would have a screen reader
+     announce the name twice before the page has said anything useful. */
+  .brand { display: flex; align-items: center; gap: 11px; margin: 0 0 2px; }
+  .brand svg { flex: none; width: 30px; height: 30px; }
   .sub { color: #8797a8; font-size: 15px; margin-bottom: 20px; }
 
   /* Touch targets are deliberately large. This is operated without looking. */
@@ -32,6 +38,12 @@
   .status b { display: block; font-size: 19px; margin-bottom: 4px; }
   .dim { color: #8797a8; font-size: 15px; }
   .said { margin-top: 18px; }
+  nav { margin: 26px 0 8px; padding-top: 18px; border-top: 1px solid #1f2a36; }
+  nav h2 { font-size: 15px; margin: 0 0 10px; }
+  nav ul { list-style: none; padding: 0; margin: 0; }
+  nav li { margin: 0 0 12px; }
+  nav a { color: #7fb4e0; }
+  nav .what { display: block; color: #8797a8; font-size: 14px; margin-top: 2px; }
   .said h2 { font-size: 15px; color: #8797a8; margin: 0 0 8px; font-weight: 600; }
   .said li { margin-bottom: 10px; padding-left: 0; list-style: none; }
   .said .t { color: #8797a8; font-size: 14px; }
@@ -41,7 +53,17 @@
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 </style>
 
-<h1>Sightline</h1>
+<div class="brand">
+  <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <g fill="none" stroke="#f2f5f8" stroke-width="4.5" stroke-linecap="round">
+      <line x1="6" y1="32" x2="26" y2="32"/>
+      <path d="M32 20a16 16 0 0 1 0 24"/>
+      <path d="M40 14a26 26 0 0 1 0 36" opacity=".62"/>
+      <path d="M48 8a36 36 0 0 1 0 48" opacity=".32"/>
+    </g>
+  </svg>
+  <h1>Sightline</h1>
+</div>
 <p class="sub" id="tagline">Audio description for content that has none.</p>
 
 <!-- Standalone mode. Almost nobody evaluating this has a Fire TV, and a blind
@@ -62,6 +84,20 @@
   <span class="dim" id="detail">Press Play with description to start.</span>
 </div>
 
+<!-- When the answering service is not reachable, say so rather than hiding
+     the feature. A reader who was told the description is "answerable
+     mid-scene" and then finds nothing has been promised something that is not
+     there; an explained absence is honest and a silent one is not. -->
+<section id="askUnavailable" hidden aria-labelledby="askOffHead">
+  <h2 id="askOffHead" class="sub" style="margin:22px 0 8px">Asking about this moment</h2>
+  <p class="sub">Sightline can be interrupted with a question while the film
+  runs — "who else is in this room?" — and answers from the frame on screen at
+  that second. That needs a service looking at the video, so it cannot run on
+  this static page, which is served as files with nothing behind it.
+  It is <a href="https://github.com/TusharTechs/sightline/blob/main/companion/server.py">in
+  the repository</a> and runs against a Fire TV or a local copy.</p>
+</section>
+
 <section id="askSection" hidden aria-labelledby="askHead">
   <h2 id="askHead" class="sub" style="margin:22px 0 10px">Ask about this moment</h2>
   <button id="askVoice" class="primary">Hold to ask a question</button>
@@ -81,6 +117,27 @@
      description, which is what a listener reported as a repeating donk. role
      is log, which is append-only by definition, and updates are not announced
      because the line is being spoken aloud at the same moment anyway. -->
+<!-- A judge or a reviewer who lands here can otherwise play one clip and has
+     nowhere to go. The three-minute stretch of the actual film and the
+     listening test were both unreachable from anywhere until this existed. -->
+<nav aria-labelledby="morehead">
+  <h2 id="morehead">More of it</h2>
+  <ul>
+    <li><a href="film/">Three minutes of the actual film, described</a>
+      <span class="what">The clip above is a trailer, which withholds its
+      story by design. This is the film itself, where there is a story to
+      follow — and it is the better test of whether the description works.</span></li>
+    <li><a href="listen/">Can you hear what the machine hears?</a>
+      <span class="what">Nineteen clips, scored in your browser. Deciding
+      whether a noise is an event or just the music swelling was the hardest
+      part of this, and this is the test of whether the distinction is
+      audible.</span></li>
+    <li><a href="https://github.com/TusharTechs/sightline">The code, and how it was built</a>
+      <span class="what">Including what two blind reviewers changed, and a
+      measurement of the content this approach cannot help with.</span></li>
+  </ul>
+</nav>
+
 <div class="said">
   <h2 id="saidHead">Described so far</h2>
   <ul id="log" role="log" aria-live="off" aria-labelledby="saidHead"></ul>
@@ -381,6 +438,8 @@
       } catch {
         askSection.hidden = true;
       }
+      // Whichever way that went, do not leave the capability unexplained.
+      el('askUnavailable').hidden = !askSection.hidden;
       say('Playing with description.');
       try { await film.play(); } catch { say('Press play on the video.'); }
     } else {
