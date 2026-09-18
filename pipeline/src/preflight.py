@@ -19,6 +19,9 @@ from collections import Counter
 # Longest stretch with no description before it counts as a hole. A listener
 # reported description "cutting out" at two minutes; it had been truncated.
 MAX_SILENCE_S = 45.0
+# Unused speakable seconds inside a silence before it counts as a fault rather
+# than as the content simply not leaving room.
+MIN_WASTED_ROOM_S = 8.0
 # A description must not begin before the previous line of dialogue has landed.
 MIN_AFTER_SPEECH_S = 0.5
 # Nor run into the next one.
@@ -39,16 +42,43 @@ def check(bundle, gaps_path=None):
     if dur is None and gaps_path and os.path.exists(gaps_path):
         dur = json.load(open(gaps_path)).get("duration_s")
 
-    # 1. Coverage. The truncation bug showed up here and nowhere else.
+    # 1. Coverage, judged against what was actually available to say it in.
+    #
+    # A long silence is only a fault if there was room to speak in it. An
+    # instructional film that narrates continuously for nine minutes leaves
+    # almost no gaps, and reporting that as a hole blames the software for the
+    # content. Found by running this over a 1951 civil defence film that is 77%
+    # narration: it has a 200-second stretch with nothing said and there is
+    # nothing wrong with it.
+    #
+    # So a hole counts only if the gaps inside it could have held something.
+    gaps = []
+    if gaps_path and os.path.exists(gaps_path):
+        gaps = json.load(open(gaps_path)).get("gaps", [])
+
+    def room_between(lo, hi):
+        """Seconds of describable gap inside a stretch."""
+        return sum(max(0.0, min(hi, g["end"]) - max(lo, g["start"])) for g in gaps)
+
     last = 0.0
     for c in cues:
         if c["t"] - last > MAX_SILENCE_S:
-            fails.append(f"{c['t'] - last:.0f}s with no description, "
-                         f"from {last:.0f}s to {c['t']:.0f}s")
+            room = room_between(last, c["t"])
+            if not gaps or room > MIN_WASTED_ROOM_S:
+                fails.append(
+                    f"{c['t'] - last:.0f}s with no description, from {last:.0f}s "
+                    f"to {c['t']:.0f}s, with {room:.0f}s of usable gap in it")
+            else:
+                notes.append(f"{c['t'] - last:.0f}s with no description from "
+                             f"{last:.0f}s, but only {room:.1f}s of it was "
+                             f"speakable -- that is the content, not a fault")
         last = c["t"] + c.get("duration", 0)
     if dur and dur - last > MAX_SILENCE_S:
-        fails.append(f"{dur - last:.0f}s with no description at the end, "
-                     f"from {last:.0f}s to {dur:.0f}s")
+        room = room_between(last, dur)
+        if not gaps or room > MIN_WASTED_ROOM_S:
+            fails.append(f"{dur - last:.0f}s with no description at the end, "
+                         f"from {last:.0f}s to {dur:.0f}s, with {room:.0f}s of "
+                         f"usable gap in it")
 
     # 2. Every referenced audio file exists. A missing one plays as silence,
     #    which is indistinguishable from nothing having happened.
