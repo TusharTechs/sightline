@@ -1,0 +1,149 @@
+{
+  "media": "content.mp4",
+  "mimeCodec": "video/mp4; codecs=\"avc1.42000D,mp4a.40.2\"",
+  "videoWidth": 320,
+  "videoHeight": 240,
+  "pictureRect": {
+    "x": 0.0,
+    "y": 0.0,
+    "w": 1.0,
+    "h": 1.0
+  },
+  "mode": "fit",
+  "builtForRate": 1.0,
+  "gaps": [
+    {
+      "start": 0.0,
+      "end": 20.83
+    },
+    {
+      "start": 22.36,
+      "end": 27.39
+    },
+    {
+      "start": 30.63,
+      "end": 38.73
+    },
+    {
+      "start": 237.45,
+      "end": 239.82
+    },
+    {
+      "start": 256.87,
+      "end": 258.32
+    },
+    {
+      "start": 539.27,
+      "end": 546.11
+    },
+    {
+      "start": 547.25,
+      "end": 551.1
+    },
+    {
+      "start": 552.58,
+      "end": 555.039
+    }
+  ],
+  "cues": [
+    {
+      "t": 5.207,
+      "rank": 6,
+      "pcm": "desc-06.pcm",
+      "text": "A cartoon turtle in a cap walks upright along a path through bare trees.",
+      "duration": 4.109,
+      "caused_by_viewer": false,
+      "why_ranked": "opening establishes the cartoon turtle"
+    },
+    {
+      "t": 10.415,
+      "rank": 2,
+      "pcm": "desc-02.pcm",
+      "text": "The turtle holds up a white daisy, smiling at it. Something stirs off screen.",
+      "duration": 4.951,
+      "caused_by_viewer": false,
+      "why_ranked": "silent change to flower close-up"
+    },
+    {
+      "t": 15.622,
+      "rank": 3,
+      "pcm": "desc-03.pcm",
+      "text": "The flower is gone. A lit stick of dynamite dangles on a wire beside him.",
+      "duration": 4.765,
+      "caused_by_viewer": false,
+      "why_ranked": "silent swap to dynamite, unhearable"
+    },
+    {
+      "t": 22.36,
+      "rank": 8,
+      "pcm": "desc-08.pcm",
+      "text": "He pulls into his shell. The tree above stands blasted, smoking.",
+      "duration": 4.614,
+      "caused_by_viewer": false,
+      "why_ranked": "blast aftermath already conveyed by bang"
+    },
+    {
+      "t": 30.63,
+      "rank": 1,
+      "pcm": "desc-01.pcm",
+      "text": "Indoors now: he wears a pith helmet and bow tie.",
+      "duration": 3.062,
+      "caused_by_viewer": false,
+      "why_ranked": "two sounds with no visible source"
+    },
+    {
+      "t": 34.68,
+      "rank": 9,
+      "pcm": "desc-09.pcm",
+      "text": "He vanishes into his shell again. A white burst flares above.",
+      "duration": 3.925,
+      "caused_by_viewer": false,
+      "why_ranked": "flash accounted for by explosion sound"
+    },
+    {
+      "t": 237.45,
+      "rank": 4,
+      "pcm": "desc-04.pcm",
+      "text": "A boy with a bat, outdoors.",
+      "duration": 1.874,
+      "caused_by_viewer": false,
+      "why_ranked": "story moves to live-action schoolyard"
+    },
+    {
+      "t": 256.87,
+      "rank": 5,
+      "pcm": "desc-05.pcm",
+      "text": "A girl, looking up",
+      "duration": 1.295,
+      "caused_by_viewer": false,
+      "why_ranked": "new person and place"
+    },
+    {
+      "t": 539.27,
+      "rank": 7,
+      "pcm": "desc-07.pcm",
+      "text": "Back to Bert the turtle, hands spread wide.",
+      "duration": 2.577,
+      "caused_by_viewer": false,
+      "why_ranked": "returns to cartoon Bert"
+    },
+    {
+      "t": 547.25,
+      "rank": 10,
+      "pcm": "desc-10.pcm",
+      "text": "A title card: made with the public schools of Astoria, New York.",
+      "duration": 3.813,
+      "caused_by_viewer": false,
+      "why_ranked": "credit card, no story"
+    },
+    {
+      "t": 552.58,
+      "rank": 11,
+      "pcm": "desc-11.pcm",
+      "text": "\"The End,\" Civil Defense emblem.",
+      "duration": 1.993,
+      "caused_by_viewer": false,
+      "why_ranked": "end card and logo"
+    }
+  ]
+}
