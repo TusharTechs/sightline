@@ -130,6 +130,13 @@ export const App = () => {
         // Nothing has described this. Offer to, rather than failing.
         setPhase('undescribed');
         setStatus('no description for this video');
+        // The audio stream has to exist before anything can be said. This
+        // branch used to return before initialize(), which is further down the
+        // described path -- so speak() hit `if (!this.stream) return` and the
+        // app went silent in the one state where a blind user has nothing else
+        // to go on: the offer to describe, and every generation stage after
+        // it, were dropped while the screen said "Press Select to create it".
+        await channel.initialize();
         await voice.load();
         await voice.say('undescribed');
         return;

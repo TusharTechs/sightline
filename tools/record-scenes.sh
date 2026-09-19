@@ -98,13 +98,17 @@ relaunch() {
 }
 
 # Boot it without a timeline, so it lands in the undescribed state.
+#
+# Returns the moment it is launched rather than waiting for the app to settle.
+# Nothing is posted in this state so there is no signal to poll, but the
+# timings are measured: silence until 2.3s, the spoken offer from 2.3s to
+# 6.2s, then quiet. That line is the whole point of the state -- it is what a
+# blind user gets instead of the on-screen "Press Select to create it" -- so
+# the recorder has to already be running when it plays.
 relaunch_undescribed() {
   vega device terminate-app -a "$APP" >/dev/null 2>&1
   sleep 2
   vega device launch-app -a "$APP" >/dev/null 2>&1
-  # Nothing is posted in this state, so there is no signal to poll. It loads
-  # the voice and says its line; this is long enough for both.
-  sleep 14
 }
 
 # ---------------------------------------------------------------- key presses
@@ -428,7 +432,8 @@ scene_2() {
   say "  booting it with nothing to play"
   relaunch_undescribed
 
-  capture "2-generation" 50 "$K_RETURN" 4   # Select, on camera
+  # Select at 9s: after the offer has finished speaking, with a beat.
+  capture "2-generation" 62 "$K_RETURN" 9
 
   say "  letting generation finish before putting the bundle back"
   local i st
