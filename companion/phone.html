@@ -29,7 +29,14 @@
   /* Touch targets are deliberately large. This is operated without looking. */
   button {
     display: block; width: 100%; min-height: 68px; margin-bottom: 12px;
-    font: 600 19px/1.3 inherit; color: #f2f5f8;
+    /* Longhands, not the `font` shorthand. `inherit` is not a valid family
+       inside that shorthand, so the whole declaration was being dropped and
+       every button fell back to the UA default -- Arial at 13.3px, which is
+       why the page was not in the system font. On the text field the same
+       mistake was worse: under 16px, iOS zooms the page the moment the field
+       is focused, which threw the layout sideways mid-question. */
+    font-weight: 600; font-size: 19px; line-height: 1.3; font-family: inherit;
+    color: #f2f5f8;
     background: #1b2530; border: 2px solid #2f3f50; border-radius: 14px;
     padding: 16px; text-align: left;
   }
@@ -42,7 +49,8 @@
      held one-handed throws the layout sideways mid-question. */
   #askText {
     display: block; width: 100%; min-height: 62px; margin-bottom: 12px;
-    font: 400 19px/1.3 inherit; color: #f2f5f8;
+    font-weight: 400; font-size: 19px; line-height: 1.3; font-family: inherit;
+    color: #f2f5f8;
     background: #121a23; border: 2px solid #2f3f50; border-radius: 14px;
     padding: 16px; -webkit-appearance: none;
   }
