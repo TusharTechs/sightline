@@ -12,6 +12,8 @@ listening to.
 """
 import json, os, subprocess, sys
 from PIL import Image, ImageDraw, ImageFont
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from repair_dropouts import repair as repair_dropouts
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TAKES = os.path.expanduser("~/Desktop/sightline-takes")
@@ -142,8 +144,10 @@ EDIT = [
     # to 0.55 put it under the floor entirely -- silent in the one scene whose
     # point is the app narrating itself. Nothing is spoken over it now.
     ("s05", S2,   0.0, 16.0,  [("04a_doing", 7.6), ("04b_how", 15.0)], 1.0),
-    ("s06", "CARD:later", 0, 2.2, [],                             0.0),
-    ("s07", S3,   0.0, 14.0,  [("05_same", 0.5)],                 1.0),
+    ("s06", "CARD:later", 0, 2.0, [],                             0.0),
+    # 14.9, not 14.0: a description runs 13.24-14.61 in this take and cutting
+    # at 14.0 sliced it mid-word -- which is the break at 1:14 in the first cut.
+    ("s07", S3,   0.0, 14.9,  [("05_same", 0.5)],                 1.0),
     # after the handoff announcement, not over it.
     ("s08", S4TV, 0.0, 17.0,  [("06_tworoom", 8.0)],              0.85),
     # the answer starts 6.5s in; this has to be finished before it.
@@ -154,7 +158,7 @@ EDIT = [
     ("s11", "CARD:table", 0, 13.5, [("14_table", 0.3)],           0.0),
     ("s12", S5,  62.0,  5.0,  [("15_limit", 0.3)],                0.16),
     ("s13", "CARD:close", 0, 6.3, [("16_close", 0.3)],            0.0),
-    ("s14", "CARD:end", 0, 3.6, [("17_name", 0.3)],               0.0),
+    ("s14", "CARD:end", 0, 3.0, [("17_name", 0.3)],               0.0),
 ]
 
 TAIL = 0.45          # breathing room after the last line in a segment
@@ -193,8 +197,18 @@ def build():
                     "anullsrc=r=48000:cl=stereo"]
             vidx, aidx = "0:v", "1:a"
         else:
-            cmd += ["-ss", f"{start}", "-t", f"{length}", "-i", src]
-            vidx, aidx = "0:v", "0:a"
+            # Pull the bed out first, put the timestamps back, and fill the
+            # dropouts before it goes anywhere near the mix.
+            raw, fixed = f"{SEGS}/{name}_raw.wav", f"{SEGS}/{name}_bed.wav"
+            run(["ffmpeg", "-hide_banner", "-v", "error", "-y",
+                 "-ss", f"{start}", "-t", f"{length}", "-i", src, "-vn",
+                 "-af", "aresample=async=1:first_pts=0",
+                 "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", raw])
+            n_fixed = repair_dropouts(raw, fixed)
+            if n_fixed:
+                print(f"        {name}: filled {n_fixed} dropout(s)")
+            cmd += ["-ss", f"{start}", "-t", f"{length}", "-i", src, "-i", fixed]
+            vidx, aidx = "0:v", "1:a"
 
         filters = [f"[{vidx}]{fit}[v]"]
         # aresample=async=1 before anything else.
@@ -207,12 +221,12 @@ def build():
         # against the clock landed over the device's own voice, and the stage
         # line went missing entirely because by then the bed had run out.
         # This materialises the gaps as real silence and puts the clock back.
-        amix = [f"[{aidx}]aresample=async=1:first_pts=0,volume={bed}[bed]"]
+        amix = [f"[{aidx}]volume={bed}[bed]"]
         labels = ["[bed]"]
         for i, (vo, at) in enumerate(vos):
             cmd += ["-i", f"{VO}/{vo}.mp3"]
             n = len(cmd) // 1  # placeholder; index computed below
-        base = 2 if str(src).startswith("CARD:") else 1
+        base = 2   # both branches now have exactly two inputs before the VOs
         for i, (vo, at) in enumerate(vos):
             idx = base + i
             amix.append(f"[{idx}:a]adelay={int(at*1000)}|{int(at*1000)},volume=1.35[vo{i}]")
