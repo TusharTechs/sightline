@@ -46,3 +46,28 @@ not exist -- plausible-looking Archive.org paths, confident statements about
 copyright status, and no item behind them. Only three were real. Anything
 sourced that way has to be checked against the archive itself before it is
 published, and the check takes a second.
+
+## Asking a question: how you can ask, per platform
+
+Measured on 19 Sep against the companion served over the local network at
+`http://<mac>:8190`.
+
+| | typed question | spoken question |
+|---|---|---|
+| iOS Safari | works | **no** — `SpeechRecognition` is not implemented at all |
+| Android Chrome, over LAN http | works | **no** — speech needs a secure context; the origin is plain http |
+| Chrome on localhost | works | works — localhost counts as secure |
+
+Two separate walls, and the second is easy to miss: the button *enables*
+itself whenever the API object exists, so on Android it looks available and
+then fails with `not-allowed` when pressed. The check is for the API, not for
+permission to use it.
+
+This is why the question field is a text input and not only a microphone. Typing
+is the one route that works on every phone, and on iOS the keyboard's own
+dictation key puts the system speech engine behind it — real speech, just not
+through the browser API.
+
+Serving the companion over HTTPS would fix the Android case. It is not done:
+a self-signed certificate makes the phone show a security warning before the
+page loads, which is a worse first experience than a text field.

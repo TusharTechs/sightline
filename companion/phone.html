@@ -36,6 +36,19 @@
   button.primary { background: #1f6feb; border-color: #1f6feb; }
   button.quick { min-height: 58px; font-size: 17px; font-weight: 500; }
   button:disabled { opacity: 0.55; }
+
+  /* Matches the buttons around it. 19px is deliberate: iOS Safari zooms the
+     whole page when a focused input's text is under 16px, which on a phone
+     held one-handed throws the layout sideways mid-question. */
+  #askText {
+    display: block; width: 100%; min-height: 62px; margin-bottom: 12px;
+    font: 400 19px/1.3 inherit; color: #f2f5f8;
+    background: #121a23; border: 2px solid #2f3f50; border-radius: 14px;
+    padding: 16px; -webkit-appearance: none;
+  }
+  #askText::placeholder { color: #8fa1b3; }
+  #askText:focus-visible { outline: 3px solid #3ddc97; outline-offset: 2px; }
+  #askForm { margin: 0; }
   button:active { transform: scale(0.99); }
   button[aria-pressed="true"] { border-color: #3ddc97; }
   button:focus-visible { outline: 3px solid #3ddc97; outline-offset: 2px; }
@@ -106,6 +119,22 @@
 <section id="askSection" hidden aria-labelledby="askHead">
   <h2 id="askHead" class="sub" style="margin:22px 0 10px">Ask about this moment</h2>
   <button id="askVoice" class="primary">Hold to ask a question</button>
+  <!-- Typing has to be here, not just the voice button and three presets.
+       SpeechRecognition does not exist in iOS Safari, so on an iPhone the
+       voice button disables itself and "ask anything about the video" quietly
+       became "pick one of three" -- on the platform where most VoiceOver users
+       are. A plain text field restores both halves of it: any question at all,
+       and real speech, because the iOS keyboard's dictation key puts the whole
+       system speech engine behind this input. -->
+  <form id="askForm" autocomplete="off">
+    <label for="askText" class="sub" style="display:block;margin:2px 0 6px">
+      Or type a question — the keyboard's microphone key works too
+    </label>
+    <input id="askText" type="text" name="q" enterkeyhint="send"
+           placeholder="Ask anything about this moment"
+           aria-describedby="askHead">
+    <button type="submit" class="quick">Ask</button>
+  </form>
   <button class="quick" data-q="What's happening right now?">What's happening right now?</button>
   <button class="quick" data-q="Who else is in this scene?">Who else is in this scene?</button>
   <button class="quick" data-q="What is she carrying?">What is she carrying?</button>
@@ -558,14 +587,28 @@
     }
   }
 
-  document.querySelectorAll('button.quick').forEach((b) =>
+  document.querySelectorAll('button.quick[data-q]').forEach((b) =>
     b.addEventListener('click', () => ask(b.dataset.q)));
+
+  const askForm = el('askForm'), askText = el('askText');
+  askForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = askText.value.trim();
+    if (!q) return;
+    // Leave the text where it is until there is an answer. Clearing on submit
+    // loses the question for anyone who wants to edit and ask again, and a
+    // screen reader has nothing to return to.
+    askText.blur();
+    ask(q);
+  });
 
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
     // Not every mobile browser has it. The preset questions are the fallback,
     // and they are also faster than speaking for the common cases.
-    askVoice.textContent = 'Voice not available on this browser';
+    // Say where speech actually is on this device rather than just refusing.
+    // On iOS the dictation key on the keyboard does the same job.
+    askVoice.textContent = 'Speak using the microphone key on the keyboard';
     askVoice.disabled = true;
   } else {
     askVoice.addEventListener('click', () => {
