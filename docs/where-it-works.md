@@ -54,8 +54,9 @@ Measured on 19 Sep against the companion served over the local network at
 
 | | typed question | spoken question |
 |---|---|---|
-| iOS Safari | works | **no** — `SpeechRecognition` is not implemented at all |
-| Android Chrome, over LAN http | works | **no** — speech needs a secure context; the origin is plain http |
+| iOS Safari, any origin | works | **not in the page** — `SpeechRecognition` is not implemented at all. The keyboard's dictation key is the route, and it is the system speech engine |
+| Android Chrome, over LAN http | works | **no** — speech needs a secure context and plain http is not one |
+| Android Chrome, over https | works | **works** |
 | Chrome on localhost | works | works — localhost counts as secure |
 
 Two separate walls, and the second is easy to miss: the button *enables*
@@ -68,6 +69,25 @@ is the one route that works on every phone, and on iOS the keyboard's own
 dictation key puts the system speech engine behind it — real speech, just not
 through the browser API.
 
-Serving the companion over HTTPS would fix the Android case. It is not done:
-a self-signed certificate makes the phone show a security warning before the
-page loads, which is a worse first experience than a text field.
+Serving the companion over HTTPS fixes the Android case, and a tunnel does it
+without a certificate warning:
+
+    cloudflared tunnel --url http://127.0.0.1:8190
+
+That prints an `https://…trycloudflare.com` address with a normally trusted
+certificate. Open **that** on the phone rather than the LAN address and the
+microphone button works. Confirmed from a browser on the tunnel:
+`isSecureContext` true, and `SpeechRecognition`, `getUserMedia` and
+`MediaRecorder` all present, where the same page on `http://<lan-ip>:8190`
+fails with `not-allowed`.
+
+Two things that follow from it. The address is public — anyone who has it can
+reach `/ask` and `/generate`, and both spend money — so stop the tunnel when
+you are not using it. And it is a new address every run, so it is no use as a
+link in a submission; the static pages are for that.
+
+None of this helps iOS. There is no `SpeechRecognition` in that browser at any
+origin, and HTTPS does not conjure one. In-page voice there would mean
+recording audio and transcribing it server-side; Transcribe here runs as a
+batch job through S3, which takes far longer than anyone will wait for an
+answer to a question about the shot they are on.
