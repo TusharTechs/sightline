@@ -507,6 +507,61 @@ check() {
   return "${FAILED:-0}"
 }
 
+# Is the phone actually following the television?
+#
+# There is no registration step to look up: the phone just polls /state. So
+# ask the three questions separately -- can the phone reach the companion at
+# all, is the television posting a live position, and is anything other than
+# this Mac connected. 'playing:true' on its own means nothing, because that
+# reading survives the app exiting.
+pair() {
+  local ip url age playing t found peers i
+
+  say "Companion"
+  ip="$(ipconfig getifaddr en0 2>/dev/null)"
+  if [ -z "$ip" ]; then
+    bad "this Mac has no address on en0 — is wifi on?"
+  else
+    url="http://$ip:8190/"
+    if curl -s -m 3 -o /dev/null "$url"; then
+      ok "reachable at $url"
+      echo "      open exactly that on the phone, then press 'Follow a Fire TV instead'"
+    else
+      bad "not answering on $url — is companion/server.py running?"
+    fi
+  fi
+
+  say "Television"
+  age="$(field age)"; playing="$(field playing)"; t="$(field t)"
+  if [ -z "$age" ]; then
+    bad "the companion has never heard from the app"
+  elif ! fresh; then
+    bad "last position was ${age}s ago — the app is not running"
+    echo "      a stale reading still says playing:${playing}; ignore it"
+    echo "      vega device launch-app -a $APP"
+  elif [ "$playing" = "True" ]; then
+    ok "playing, ${t}s in (${age}s ago)"
+  else
+    warn "app is up but paused at ${t}s — press Select on the device"
+  fi
+
+  say "Phone"
+  for i in $(seq 1 8); do
+    peers="$(lsof -nP -iTCP:8190 2>/dev/null | grep ESTABLISHED | grep -v 127.0.0.1 | awk '{print $9}')"
+    [ -n "$peers" ] && { found="$peers"; break; }
+    sleep 1
+  done
+  if [ -n "$found" ]; then
+    ok "something other than this Mac is connected:"
+    echo "$found" | sed 's/->.*//' | sort -u | sed 's/^/        /'
+    echo "      on the phone the button should read 'Following the television'"
+  else
+    bad "no phone connected in 8 seconds"
+    echo "      same wifi? opened the address above, not the GitHub Pages site?"
+    echo "      the hosted pages are standalone and never follow a television."
+  fi
+}
+
 list() {
   cat <<'TXT'
 
@@ -537,11 +592,12 @@ TXT
 case "${1:-list}" in
   list)  list ;;
   check) check ;;
+  pair)  pair ;;
   1)     check >/dev/null; scene_1 ;;
   2)     scene_2 ;;
   3)     scene_3 ;;
   4tv)   scene_4tv ;;
   5)     scene_5 ;;
   all)   check || exit 1; echo; scene_1; echo; scene_3; echo; scene_4tv; echo; scene_5; echo; scene_2 ;;
-  *) echo "usage: $0 [list|check|1|2|3|4tv|5|all]"; exit 1 ;;
+  *) echo "usage: $0 [list|check|pair|1|2|3|4tv|5|all]"; exit 1 ;;
 esac
