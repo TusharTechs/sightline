@@ -88,11 +88,32 @@ record() {
   echo "Recording to $OUT"
   echo "Press ctrl-C to stop. Give it two seconds of silence before you start talking."
   echo
-  # 30fps is plenty for a UI demo and keeps the file manageable. Audio is
-  # captured at 48k to match what Polly and the device produce.
+  echo "If it stalls with no output, macOS has not granted this terminal Screen"
+  echo "Recording. System Settings -> Privacy & Security -> Screen Recording,"
+  echo "add your terminal, then quit and reopen it — the permission only takes"
+  echo "effect on a fresh launch."
+  echo
+  # Three things here are not optional on a Retina Mac, and the first attempt
+  # at this got all three wrong:
+  #
+  #  -pixel_format uyvy422   the screen device offers uyvy422/nv12/bgr0 and
+  #                          NOT yuv420p. Asking for yuv420p on the input makes
+  #                          ffmpeg warn and override, and the device
+  #                          configuration fails back to defaults.
+  #  scale=1920:-2           this display is 2560x1600. Encoding that many
+  #                          macroblocks a second exceeds H.264's level limit
+  #                          ("MB rate > level limit") and produces a file
+  #                          QuickTime may refuse. 1080p is also what the
+  #                          capture checklist asks for.
+  #  fps=30                  avfoundation reports no frame rate, so without
+  #                          this the timebase comes out absurd and the file is
+  #                          flagged as possibly unplayable.
+  #
+  # yuv420p goes on the OUTPUT, where it belongs, for player compatibility.
   ffmpeg -hide_banner -loglevel warning \
-    -f avfoundation -capture_cursor 1 -framerate 30 -i "1:${audio_in}" \
-    -c:v libx264 -preset ultrafast -crf 18 -pix_fmt yuv420p \
+    -f avfoundation -capture_cursor 1 -pixel_format uyvy422 -i "1:${audio_in}" \
+    -vf "scale=1920:-2,fps=30" \
+    -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
     -c:a aac -b:a 192k -ar 48000 \
     "$OUT"
   echo
