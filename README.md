@@ -51,6 +51,7 @@ The quickest way to check this is real rather than described:
 | **that it is not one hand-tuned clip** | three different videos described by the same pipeline — [a film](https://tushartechs.github.io/sightline/film/), [a 1951 instructional film](https://tushartechs.github.io/sightline/duck/), and the trailer |
 | **where it does NOT work** | [`docs/where-it-works.md`](docs/where-it-works.md) — measured. An advert produces zero descriptions |
 | **what the platform cost us** | [`FRICTION-LOG.md`](FRICTION-LOG.md) — 15 findings from building on Vega, written while building |
+| **everything we would ask Amazon to fix** | [`FEEDBACK.md`](FEEDBACK.md) — 21 requests with priorities, plus what worked and what did not, per tool |
 | **what we learned about Vega** | [`FRICTION-LOG.md`](FRICTION-LOG.md) (15 entries) and [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) |
 | **what is not finished** | [`STATUS.md`](STATUS.md) — kept honest, including what no blind user has tested yet |
 | **the Open Source entry** | [audio-description-qa](https://github.com/TusharTechs/audio-description-qa) — the blind-tester QA harness, released separately under MIT so anyone writing description can use it |
