@@ -121,24 +121,44 @@ S4TV = T("scene-4tv-handoff-150051.mov")
 S4P = T("scene-4phone-clean.mov")
 S5 = T("scene-5-plate-150309.mov")
 
+# (name, source, in-point, minimum length, [(vo, at)], bed gain)
+#
+# The length is a MINIMUM. The builder extends a segment so the last narration
+# line finishes inside it, because the first cut trimmed one off mid-sentence:
+# five lines were placed by hand into 38.8 seconds and the fifth needed 40.
+#
+# Placements avoid the device's own voice rather than ducking under it. Two
+# voices at once reads as a fault, not as layering. Measured in the takes:
+# the app speaks its offer at 2.6-7.0s and its stage line at 13.3-14.5s of the
+# generation take, and announces the handoff in the first seven seconds of the
+# phone-handoff take. Narration goes in the gaps between those.
 EDIT = [
     ("s01", S1,   0.0,  7.0,  [],                                 1.0),
-    ("s02", S5,   0.0,  8.2,  [("01_gap", 0.3)],                  0.22),
-    ("s03", S5,   8.2, 15.0,  [("02_exists", 0.3)],               0.22),
-    ("s04", "CARD:mark", 0, 6.6, [("03_built", 0.3)],             0.0),
-    ("s05", S2,   0.0, 18.0,  [("04_generating", 7.5)],           0.55),
-    ("s06", "CARD:later", 0, 2.5, [],                             0.0),
-    ("s07", S3,   0.0, 16.0,  [("05_same", 0.5)],                 1.0),
-    ("s08", S4TV, 0.0, 18.0,  [("06_tworoom", 0.5), ("07_ask", 8.3)], 0.30),
-    ("s09", S4P,  0.0, 20.0,  [],                                 1.0),
-    ("s10", S5,  23.2, 38.8,  [("09_reviewers", 0.3), ("10_dave", 7.8),
-                               ("11_watcher", 18.4), ("12_credit", 28.2),
-                               ("13_measured", 36.4)],            0.16),
-    ("s11", "CARD:table", 0, 13.6, [("14_table", 0.3)],           0.0),
-    ("s12", S5,  62.0,  5.2,  [("15_limit", 0.3)],                0.16),
-    ("s13", "CARD:close", 0, 6.4, [("16_close", 0.3)],            0.0),
-    ("s14", "CARD:end", 0, 4.0, [("17_name", 0.3)],               0.0),
+    ("s02", S5,   0.0,  8.0,  [("01_gap", 0.3)],                  0.22),
+    ("s03", S5,   8.2, 14.9,  [("02_exists", 0.3)],               0.22),
+    ("s04", "CARD:mark", 0, 6.5, [("03_built", 0.3)],             0.0),
+    # 04a lands in the 7.0-13.3 gap; 04b after the stage line ends at 14.5.
+    # bed at full: the app's stage line is quieter than its offer, and ducking
+    # to 0.55 put it under the floor entirely -- silent in the one scene whose
+    # point is the app narrating itself. Nothing is spoken over it now.
+    ("s05", S2,   0.0, 16.0,  [("04a_doing", 7.6), ("04b_how", 15.0)], 1.0),
+    ("s06", "CARD:later", 0, 2.2, [],                             0.0),
+    ("s07", S3,   0.0, 14.0,  [("05_same", 0.5)],                 1.0),
+    # after the handoff announcement, not over it.
+    ("s08", S4TV, 0.0, 17.0,  [("06_tworoom", 8.0)],              0.85),
+    # the answer starts 6.5s in; this has to be finished before it.
+    ("s09", S4P,  0.0, 18.0,  [("07b_ask", 0.2)],                 1.0),
+    ("s10", S5,  23.2, 38.0,  [("09_reviewers", 0.3), ("10_dave", 7.7),
+                               ("11_watcher", 18.2), ("12_credit", 27.9),
+                               ("13_measured", 36.0)],            0.16),
+    ("s11", "CARD:table", 0, 13.5, [("14_table", 0.3)],           0.0),
+    ("s12", S5,  62.0,  5.0,  [("15_limit", 0.3)],                0.16),
+    ("s13", "CARD:close", 0, 6.3, [("16_close", 0.3)],            0.0),
+    ("s14", "CARD:end", 0, 3.6, [("17_name", 0.3)],               0.0),
 ]
+
+TAIL = 0.45          # breathing room after the last line in a segment
+LIMIT = 180.0        # the rules say under three minutes
 
 def build():
     for d in (BUILD, CARDS, SEGS):
@@ -149,8 +169,19 @@ def build():
     card_mark(f"{CARDS}/close.png")
     card_end(f"{CARDS}/end.png")
 
+    plan = []
+    for name, src, start, min_len, vos, bed in EDIT:
+        need = max([vo_at + dur(f"{VO}/{vo}.mp3") + TAIL for vo, vo_at in vos],
+                   default=0.0)
+        plan.append((name, src, start, round(max(min_len, need), 2), vos, bed))
+    total = sum(p[3] for p in plan)
+    print(f"  planned runtime {total:.1f}s" +
+          ("" if total <= LIMIT else f"  OVER the {LIMIT:.0f}s limit by {total-LIMIT:.1f}s"))
+    if total > LIMIT:
+        sys.exit("refusing to build a cut that breaks the rule")
+
     parts = []
-    for name, src, start, length, vos, bed in EDIT:
+    for name, src, start, length, vos, bed in plan:
         out = f"{SEGS}/{name}.mov"
         fit = (f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
                f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x0b0f14,fps=30,setsar=1")
@@ -166,7 +197,17 @@ def build():
             vidx, aidx = "0:v", "0:a"
 
         filters = [f"[{vidx}]{fit}[v]"]
-        amix = [f"[{aidx}]volume={bed}[bed]"]
+        # aresample=async=1 before anything else.
+        #
+        # The screen captures are short of samples -- BlackHole does not
+        # deliver during silence, so a 62s take decodes to 54.7s of audio. The
+        # packets carry correct timestamps and a player stays in sync, but a
+        # filter chain that just decodes collapses every gap and drags all the
+        # audio earlier. That is what broke the voiceover: narration written
+        # against the clock landed over the device's own voice, and the stage
+        # line went missing entirely because by then the bed had run out.
+        # This materialises the gaps as real silence and puts the clock back.
+        amix = [f"[{aidx}]aresample=async=1:first_pts=0,volume={bed}[bed]"]
         labels = ["[bed]"]
         for i, (vo, at) in enumerate(vos):
             cmd += ["-i", f"{VO}/{vo}.mp3"]
