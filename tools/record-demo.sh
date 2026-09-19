@@ -29,21 +29,58 @@ audio_device_id() {
     | head -1 | sed -E 's/.*\[([0-9]+)\].*/\1/'
 }
 
+# Which device macOS is actually playing through.
+default_output() {
+  system_profiler SPAudioDataType 2>/dev/null | awk '
+    /^ {8}[A-Za-z].*:$/ { s=$0; gsub(/^ +/,"",s); gsub(/ *:$/,"",s); dev=s }
+    /Default Output Device: Yes/ { print dev; exit }'
+}
+
+# Prove sound actually ARRIVES, rather than that a device exists.
+#
+# The old check passed as long as something BlackHole-shaped showed up in the
+# input list. It does not follow that anything is routed to it: installing
+# BlackHole creates the device but changes no routing, so system audio keeps
+# going to the speakers and the capture is digital silence. That green tick
+# cost a six-minute take that came back at -91 dB. This plays a sound and
+# listens for it.
+audio_reaches_recorder() {
+  local aid probe mean ff
+  aid="$(audio_device_id)"
+  if [ -z "$aid" ]; then
+    bad "no system-audio capture device — install BlackHole (brew install blackhole-2ch)"
+    return 1
+  fi
+  probe="$(mktemp -t slaud).wav"
+  ffmpeg -hide_banner -v error -f avfoundation -i ":$aid" -t 2 -y "$probe" </dev/null 2>/dev/null &
+  ff=$!
+  sleep 0.4
+  afplay /System/Library/Sounds/Ping.aiff 2>/dev/null
+  wait "$ff" 2>/dev/null
+  mean="$(ffmpeg -hide_banner -i "$probe" -af volumedetect -f null - 2>&1 \
+          | awk -F': ' '/mean_volume/{print $2}' | tr -d ' dB')"
+  rm -f "$probe"
+  if [ -z "$mean" ] || (( $(echo "${mean:--91} < -80" | bc -l) )); then
+    bad "capture device is SILENT — your audio is not routed to it"
+    echo "      playing through: $(default_output)"
+    echo "      Fix, either way:"
+    echo "        • Audio MIDI Setup -> + -> Multi-Output Device -> tick BlackHole 2ch"
+    echo "          AND your speakers -> set that device as the system output."
+    echo "          (you hear the app and it records)"
+    echo "        • or set the system output straight to BlackHole 2ch"
+    echo "          (it records, you hear nothing while filming)"
+    return 1
+  fi
+  ok "sound reaches the recorder (${mean} dB, via $(default_output))"
+}
+
 check() {
   FAILED=0
   echo "Recording setup"
 
   command -v ffmpeg >/dev/null && ok "ffmpeg present" || bad "ffmpeg missing — brew install ffmpeg"
 
-  local aid; aid="$(audio_device_id)"
-  if [ -n "$aid" ]; then
-    ok "system audio device found (index $aid)"
-  else
-    bad "no system-audio device. You will record your speakers through the mic."
-    echo "      brew install blackhole-2ch"
-    echo "      then Audio MIDI Setup -> + -> Multi-Output Device -> tick BlackHole 2ch"
-    echo "      and your speakers, and set that as the system output."
-  fi
+  audio_reaches_recorder
 
   echo
   echo "What the app needs"
