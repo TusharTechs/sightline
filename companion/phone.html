@@ -595,10 +595,11 @@
     }
   }
 
+  const askText = el('askText');
   document.querySelectorAll('button.quick[data-q]').forEach((b) =>
     b.addEventListener('click', () => ask(b.dataset.q)));
 
-  const askForm = el('askForm'), askText = el('askText');
+  const askForm = el('askForm');
   askForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const q = askText.value.trim();
@@ -614,10 +615,16 @@
   if (!SR) {
     // Not every mobile browser has it. The preset questions are the fallback,
     // and they are also faster than speaking for the common cases.
-    // Say where speech actually is on this device rather than just refusing.
-    // On iOS the dictation key on the keyboard does the same job.
-    askVoice.textContent = 'Speak using the microphone key on the keyboard';
-    askVoice.disabled = true;
+    // Do not leave a dead button. iOS Safari has no SpeechRecognition and no
+    // version of it is coming, but the keyboard's dictation key is the system
+    // speech engine and it works. So this button still speaks -- it opens the
+    // field with the keyboard up, one tap from the microphone, instead of
+    // refusing and leaving the user with three fixed questions.
+    askVoice.textContent = 'Speak your question';
+    askVoice.addEventListener('click', () => {
+      askText.focus();
+      say('Keyboard open. Use the microphone key to speak your question.');
+    });
   } else {
     askVoice.addEventListener('click', () => {
       const rec = new SR();
