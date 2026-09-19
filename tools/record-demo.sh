@@ -51,12 +51,22 @@ audio_reaches_recorder() {
     bad "no system-audio capture device — install BlackHole (brew install blackhole-2ch)"
     return 1
   fi
+  # Generate the test sound rather than using a system one. Ping.aiff is a
+  # third of a second long and macOS routes alert sounds by their own output
+  # setting, so it could miss the capture window or never reach the device at
+  # all -- which reported a correctly-routed Multi-Output as silent. A tone of
+  # known length and level cannot be missed.
+  local tone
+  tone="$(mktemp -t sltone).wav"
   probe="$(mktemp -t slaud).wav"
-  ffmpeg -hide_banner -v error -f avfoundation -i ":$aid" -t 2 -y "$probe" </dev/null 2>/dev/null &
+  ffmpeg -hide_banner -v error -f lavfi -i "sine=frequency=440:duration=2" \
+    -ar 48000 -ac 2 -y "$tone" 2>/dev/null
+  ffmpeg -hide_banner -v error -f avfoundation -i ":$aid" -t 3 -y "$probe" </dev/null 2>/dev/null &
   ff=$!
-  sleep 0.4
-  afplay /System/Library/Sounds/Ping.aiff 2>/dev/null
+  sleep 0.5
+  afplay "$tone" 2>/dev/null
   wait "$ff" 2>/dev/null
+  rm -f "$tone"
   mean="$(ffmpeg -hide_banner -i "$probe" -af volumedetect -f null - 2>&1 \
           | awk -F': ' '/mean_volume/{print $2}' | tr -d ' dB')"
   rm -f "$probe"
