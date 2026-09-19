@@ -11,6 +11,7 @@ female voice, and a judge should never be unsure which of the two they are
 listening to.
 """
 import json, os, subprocess, sys
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -162,6 +163,109 @@ EDIT = [
 TAIL = 0.45          # breathing room after the last line in a segment
 LIMIT = 180.0        # the rules say under three minutes
 
+
+# ---------------------------------------------------------------- music
+#
+# Dreamscape (Density & Time, YouTube Audio Library). Chosen by measurement,
+# not by ear: of the nine candidates it puts only 11.1% of its energy in
+# 200Hz-4kHz, where speech lives. The rest sit between 51% and 98.9% -- one of
+# them, Stillness, is 98.9% and would have masked every description in the
+# film while sounding perfectly pleasant on its own.
+#
+# It does climb about 11dB over its length, so the bed is drawn from after the
+# opening ramp and then level-corrected against its own envelope. What is left
+# is a constant floor rather than something that creeps up under the narration.
+MUSIC = "dreamscape"
+MUSIC_FROM = 60.0        # past the opening ramp
+
+# Target RMS per segment, in dBFS. None means silence -- and the three Nones
+# are the argument of the film:
+#   s01  the seven seconds with no description. Scoring it destroys the point.
+#   s07  the described passage. This is the exhibit.
+#   s09  the phone answering a question. Also the exhibit.
+MUSIC_DB = {
+    "s01": None,   "s02": -34.0, "s03": -34.0, "s04": -30.0,
+    "s05": -38.0,  # the app narrating itself; present, never competing
+    "s06": -26.0,  # a card with nothing spoken over it
+    "s07": None,   "s08": -36.0, "s09": None,  "s10": -34.0,
+    "s11": -30.0,  "s12": -34.0, "s13": -30.0, "s14": -26.0,
+}
+RAMP = 0.9               # seconds to fade in or out of a region
+
+
+def build_music_bed(plan, out_wav):
+    """A bed that holds one level, and gets out of the way three times."""
+    import wave
+    src = f"{BUILD}/music/{MUSIC}.wav"
+    w = wave.open(src, "rb")
+    sr = w.getframerate()
+    raw = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
+    w.close()
+    a = raw.astype(np.float32).reshape(-1, 2) / 32768.0
+    a = a[int(MUSIC_FROM * sr):]
+
+    total = sum(p[3] for p in plan)
+    need = int(total * sr) + sr
+    while len(a) < need:                       # loop if the track runs out
+        a = np.concatenate([a, a])
+    a = a[:need]
+
+    # Flatten the track's own drift: measure a slow RMS and divide it out.
+    win = int(3.0 * sr)
+    mono = a.mean(axis=1)
+    centres, levels = [], []
+    for i in range(0, len(mono) - win, win // 2):
+        centres.append(i + win // 2)
+        levels.append(max(np.sqrt((mono[i:i + win] ** 2).mean()), 1e-5))
+    env = np.interp(np.arange(len(mono)), centres, levels)
+    ref = 10 ** (-20.0 / 20.0)
+    correction = np.clip(ref / env, 0.0, 10 ** (12.0 / 20.0))
+    a = a * correction[:, None]
+
+    # Per-segment target, with ramps built INSIDE each region.
+    #
+    # Not a smoothing pass over the whole envelope: convolution bleeds a
+    # fade-in backwards across the boundary, and the first region is the seven
+    # seconds of silence that the whole film argues from. It measured -56dBFS
+    # instead of nothing. Ramps drawn inside each region cannot leak into the
+    # one next door.
+    gain = np.zeros(len(mono), dtype=np.float32)
+    k = int(RAMP * sr)
+    bounds, t = [], 0.0
+    for name, _src, _st, length, _vos, _bed in plan:
+        bounds.append((name, t, t + length))
+        t += length
+    for idx, (name, t0, t1) in enumerate(bounds):
+        db = MUSIC_DB.get(name)
+        if db is None:
+            continue
+        lin = 10 ** ((db + 20.0) / 20.0)
+        i0, i1 = int(t0 * sr), min(int(t1 * sr), len(gain))
+        gain[i0:i1] = lin
+        prev_db = MUSIC_DB.get(bounds[idx - 1][0]) if idx else None
+        next_db = MUSIC_DB.get(bounds[idx + 1][0]) if idx + 1 < len(bounds) else None
+        n = min(k, (i1 - i0) // 2)
+        if n > 0 and prev_db is None:
+            gain[i0:i0 + n] *= np.linspace(0.0, 1.0, n, dtype=np.float32)
+        if n > 0 and next_db is None:
+            gain[i1 - n:i1] *= np.linspace(1.0, 0.0, n, dtype=np.float32)
+    # ease the steps between two regions that both have music
+    sm = int(0.35 * sr)
+    if sm > 1:
+        gain = np.convolve(gain, np.ones(sm, dtype=np.float32) / sm, mode="same")
+    # and make absolutely certain the silent regions are silent
+    for name, t0, t1 in bounds:
+        if MUSIC_DB.get(name) is None:
+            gain[int(t0 * sr):min(int(t1 * sr), len(gain))] = 0.0
+    a = a * gain[:, None]
+
+    out = wave.open(out_wav, "wb")
+    out.setnchannels(2); out.setsampwidth(2); out.setframerate(sr)
+    out.writeframes((np.clip(a, -1, 1) * 32767).astype(np.int16).tobytes())
+    out.close()
+    return out_wav
+
+
 def build():
     for d in (BUILD, CARDS, SEGS):
         os.makedirs(d, exist_ok=True)
@@ -250,11 +354,20 @@ def build():
     with open(listfile, "w") as f:
         for p in parts:
             f.write(f"file '{p}'\n")
-    final = os.path.expanduser("~/Desktop/sightline-demo.mp4")
+    silent = f"{BUILD}/cut.mp4"
     run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-f", "concat",
          "-safe", "0", "-i", listfile,
          "-c:v", "libx264", "-preset", "medium", "-crf", "19",
-         "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+         "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", "-ar", "48000", silent])
+
+    bed = build_music_bed(plan, f"{BUILD}/music_bed.wav")
+    final = os.path.expanduser("~/Desktop/sightline-demo.mp4")
+    run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", silent, "-i", bed,
+         "-filter_complex",
+         "[0:a][1:a]amix=inputs=2:duration=first:dropout_transition=0:"
+         "normalize=0,alimiter=limit=0.95[a]",
+         "-map", "0:v", "-map", "[a]",
+         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
          "-movflags", "+faststart", final])
     print(f"\n  FINAL {dur(final):.1f}s -> {final}")
 
