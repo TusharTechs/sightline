@@ -13,7 +13,8 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 
 <br>
 
-[**▶ Live demo**](https://tushartechs.github.io/sightline/) &nbsp;·&nbsp;
+[**▶ Demo video (3 min)**](https://youtu.be/vqJsFDnj7ko) &nbsp;·&nbsp;
+[**Live demo**](https://tushartechs.github.io/sightline/) &nbsp;·&nbsp;
 [**Watch it work**](#watch-it-work) &nbsp;·&nbsp;
 [**Try it yourself**](#try-it-without-a-fire-tv) &nbsp;·&nbsp;
 [**vs a phone app**](#what-this-does-that-a-phone-app-pointed-at-a-screen-does-not) &nbsp;·&nbsp;
@@ -22,6 +23,12 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 [**AWS**](#aws-integration) &nbsp;·&nbsp;
 [**Why it works this way**](#how-we-knew-what-to-build) &nbsp;·&nbsp;
 [**Limitations**](#limitations)
+
+<br>
+
+[![Sightline: audio description for content that has none](docs/demo-thumbnail.jpg)](https://youtu.be/vqJsFDnj7ko)
+
+**[Watch the three-minute demo](https://youtu.be/vqJsFDnj7ko)**
 
 <br>
 
@@ -35,6 +42,7 @@ The quickest way to check this is real rather than described:
 
 | to see | open |
 |---|---|
+| **the whole thing in three minutes** | [the demo video](https://youtu.be/vqJsFDnj7ko) — the app on the device, a real generation run, and a question answered live |
 | **that it works** | [the live demo](https://tushartechs.github.io/sightline/) — press play and listen |
 | **that it runs on the device** | [`app/`](app/) — a real Vega OS app; [`probes/`](probes/) shows what the platform would and would not do |
 | **that the numbers are real** | [Evidence](#evidence) — two of them reproduce with the commands given |
@@ -45,9 +53,10 @@ The quickest way to check this is real rather than described:
 | **what the platform cost us** | [`FRICTION-LOG.md`](FRICTION-LOG.md) — 15 findings from building on Vega, written while building |
 | **what we learned about Vega** | [`FRICTION-LOG.md`](FRICTION-LOG.md) (15 entries) and [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) |
 | **what is not finished** | [`STATUS.md`](STATUS.md) — kept honest, including what no blind user has tested yet |
+| **the Open Source entry** | [audio-description-qa](https://github.com/TusharTechs/audio-description-qa) — the blind-tester QA harness, released separately under MIT so anyone writing description can use it |
 
 **Fastest check of all:** [tushartechs.github.io/sightline](https://tushartechs.github.io/sightline/) — press play and listen. Nothing to
-install. The submission video is not made yet.
+install.
 
 ## Where this sits against the Fire TV priority categories
 
@@ -112,6 +121,10 @@ batch job months earlier, you can interrupt it and ask a question.
 ---
 
 ## Watch it work
+
+**[▶ The three-minute demo video](https://youtu.be/vqJsFDnj7ko)** — the app running on
+the Vega virtual device, a real generation run against a clip nothing had ever
+described, and a question typed and answered live on a second screen.
 
 ![Sightline describing a film on Fire TV](docs/screens/sightline.gif)
 
