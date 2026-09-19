@@ -21,6 +21,7 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 [**Architecture**](#architecture) &nbsp;·&nbsp;
 [**Evidence**](#evidence) &nbsp;·&nbsp;
 [**AWS**](#aws-integration) &nbsp;·&nbsp;
+[**Where AI is used**](#where-ai-is-used-and-where-it-is-not) &nbsp;·&nbsp;
 [**Why it works this way**](#how-we-knew-what-to-build) &nbsp;·&nbsp;
 [**Limitations**](#limitations)
 
@@ -58,6 +59,18 @@ The quickest way to check this is real rather than described:
 
 **Fastest check of all:** [tushartechs.github.io/sightline](https://tushartechs.github.io/sightline/) — press play and listen. Nothing to
 install.
+
+### How this maps to the judging criteria
+
+| criterion | where to look |
+|---|---|
+| **Technological implementation** | [Architecture](#architecture) and [AWS integration](#aws-integration). Speech detection rather than silence detection, 2.5 usable seconds becoming 39.8. Every line measured against its gap before it is kept. A second audio stream on the device so description ducks the film rather than fighting it |
+| **Design** | [Try it without a Fire TV](#try-it-without-a-fire-tv). Every control confirms itself aloud, because the user cannot see the HUD. VoiceView could not be enabled on the virtual device ([FL-011](FRICTION-LOG.md)), so the app speaks for itself |
+| **Potential impact** | [How we knew what to build](#how-we-knew-what-to-build). Two blind reviewers, quoted directly. The co-viewing mode exists for one room: a blind viewer and a sighted viewer who want different things from the same screen |
+| **Quality of the idea** | [What this does that a phone app pointed at a screen does not](#what-this-does-that-a-phone-app-pointed-at-a-screen-does-not), and [Limitations](#limitations). It describes what was never going to be described, and it says where it stops |
+| **Friction log bonus** | [`FRICTION-LOG.md`](FRICTION-LOG.md), 15 entries, each with task, steps, expected against actual, severity, workaround and suggestion. Summarised with priorities in [`FEEDBACK.md`](FEEDBACK.md) |
+| **AWS Builder mini challenge** | [AWS integration](#aws-integration). Transcribe, Polly, S3, Lambda and API Gateway, with measurements. Bedrock is included as a documented failure rather than omitted |
+| **Open Source mini challenge** | [audio-description-qa](https://github.com/TusharTechs/audio-description-qa), MIT, created during the hackathon window |
 
 ## Where this sits against the Fire TV priority categories
 
@@ -388,26 +401,64 @@ walkthrough results are not.
 
 ## Run it
 
+Everything here runs on **macOS, Linux and Windows**. The pipeline and the
+companion service are plain Python with no platform specific calls, and the app
+is built with the Vega CLI, which Amazon ships for all three.
+
+The only macOS specific things in this repository are the two scripts in
+`tools/` used to record the demo video. They are not needed to run, build or
+evaluate anything.
+
+### What you need
+
+| | |
+|---|---|
+| Python | 3.10 or newer |
+| ffmpeg | on your `PATH`. `brew install ffmpeg`, `sudo apt install ffmpeg`, or `winget install ffmpeg` |
+| AWS credentials | for Transcribe and Polly, if you want to generate a description from scratch |
+| Vega SDK and CLI | only for the device app. Not needed for the pipeline or the web player |
+
 <details>
-<summary><b>Pipeline only — no Fire TV needed</b></summary>
+<summary><b>Pipeline only, no Fire TV needed</b></summary>
+
+**macOS and Linux**
 
 ```bash
 cd pipeline
-python3 -m venv .venv && .venv/bin/pip install anthropic boto3 pillow numpy
-export ANTHROPIC_API_KEY=...            # or ~/.config/sightline-anthropic-key
+python3 -m venv .venv
+.venv/bin/pip install anthropic boto3 pillow numpy
+export ANTHROPIC_API_KEY=...            # or write it to ~/.config/sightline-anthropic-key
 
-# film: find where nobody is speaking, describe the changes, render a clip
 .venv/bin/python src/detect_speech.py video.mp4 --cache out/t.json --out out/gaps.json
 .venv/bin/python src/film_cues.py video.mp4 out/gaps.json --transcript out/t.json --out out/cues.json
 .venv/bin/python src/export_device_bundle.py out/cues.json video.mp4 --gaps out/gaps.json --out /tmp/bundle
 .venv/bin/python src/render_from_bundle.py /tmp/bundle --rate 1.0 --out out/described.mp4
 ```
 
-Requires AWS credentials for Transcribe and Polly.
+**Windows, PowerShell**
+
+```powershell
+cd pipeline
+py -3 -m venv .venv
+.venv\Scripts\pip install anthropic boto3 pillow numpy
+$env:ANTHROPIC_API_KEY = "..."
+
+.venv\Scripts\python src\detect_speech.py video.mp4 --cache out\t.json --out out\gaps.json
+.venv\Scripts\python src\film_cues.py video.mp4 out\gaps.json --transcript out\t.json --out out\cues.json
+.venv\Scripts\python src\export_device_bundle.py out\cues.json video.mp4 --gaps out\gaps.json --out $env:TEMP\bundle
+.venv\Scripts\python src\render_from_bundle.py $env:TEMP\bundle --rate 1.0 --out out\described.mp4
+```
+
+Requires AWS credentials for Transcribe and Polly. If your network inspects
+TLS, set `SIGHTLINE_CA_BUNDLE` to your corporate bundle; boto3 does not read
+`SSL_CERT_FILE`, which is its own small trap.
 </details>
 
 <details>
 <summary><b>On the Fire TV virtual device</b></summary>
+
+Paths below are POSIX. On Windows use `.venv\Scripts\python` and `$env:TEMP`
+in place of `/tmp`, as above.
 
 ```bash
 # 1. build a bundle (above), plus the app's own voice
@@ -423,13 +474,61 @@ vega device install-app -p build/aarch64-debug/sightline_aarch64.vpkg
 vega device launch-app -a com.sightline.tv.main
 ```
 
-Then open `http://<your-lan-ip>:8190/` on a phone on the same network.
+Then open `http://<your-lan-ip>:8190/` on a phone on the same network and press
+**Follow a Fire TV instead**.
 
-**Remote:** Select plays/pauses · Right changes speed · Up switches mode ·
+**Remote:** Select plays and pauses · Right changes speed · Up switches mode ·
 Down moves description to the phone · Menu speaks the controls.
 </details>
 
+<details>
+<summary><b>Nothing installed at all</b></summary>
+
+[tushartechs.github.io/sightline](https://tushartechs.github.io/sightline/)
+runs the same timeline and the same generated audio in any browser, on any
+operating system. Press **Play with description**.
+</details>
+
 ---
+
+## Where AI is used, and where it is not
+
+Judges should be able to tell these apart, so they are separated here.
+
+**AI is the product, in three places.** These are not development aids, they
+are what the thing does:
+
+| | |
+|---|---|
+| Writing the descriptions | A vision language model reads frame pairs from each gap and writes the line. This is the core of the project |
+| Answering questions | The same model, given the frame you are on plus the dialogue and descriptions so far |
+| Speech and timing | Amazon Polly speaks every line, Amazon Transcribe supplies the word timings that define the gaps |
+
+**AI assisted the development**, as a coding assistant, the way most software
+is now written. It wrote code under direction and was corrected constantly.
+
+**What is not AI, and is the actual work:**
+
+- **Choosing the problem, and checking it was real.** Audio description does
+  not exist for most video because someone has to be paid to write it.
+- **The rules the descriptions follow.** These came from blind reviewers on the
+  [ACB Audio Description Project](https://www.acb.org/adp/) mailing list, not
+  from a model and not from me. Nothing during dialogue, nothing that repeats
+  the soundtrack, never "the camera pans".
+- **The architecture.** Detecting speech rather than silence, which turned 2.5
+  usable seconds into 39.8. Ranking descriptions so the right ones survive at
+  speed. Measuring every line against its gap before keeping it.
+- **Finding out where it fails.** The measurements in
+  [`docs/where-it-works.md`](docs/where-it-works.md), including the advert that
+  correctly produces nothing.
+- **Getting it tested by blind users, and acting on what came back.** Two
+  reviewers, six faults, all fixed, and a QA harness released so the next
+  person does not repeat them.
+- **The fifteen findings in [`FRICTION-LOG.md`](FRICTION-LOG.md)**, written
+  while building.
+
+A model can write a line of description. It cannot tell you that the line is
+wrong because a blind viewer does not care where the camera is.
 
 ---
 
