@@ -241,7 +241,7 @@ audio_reaches_recorder() {
 # startup and the button never made it into the take -- the app's reported
 # target was unchanged afterwards, which is how it was caught.
 capture() {
-  local name="$1" dur="$2" key="${3:-}" after="${4:-0}" rect aid out ff i
+  local name="$1" dur="$2" key="${3:-}" after="${4:-0}" rect aid out ff vf i vraw araw
   focus_window
   rect="$(crop_rect)"
   [ -z "$rect" ] && { bad "cannot find the '$WIN' window"; return 1; }
@@ -252,19 +252,32 @@ capture() {
 
   printf "  \033[36m● recording %ss\033[0m -> %s\n" "$dur" "${out##*/}"
   printf "    do not click anything — a window moved on top lands in the take\n"
-  ffmpeg -hide_banner -loglevel error \
+  # Video and audio as two processes, and the encoder runs at low priority.
+  #
+  # One ffmpeg capturing both starves its own audio thread. Measured against a
+  # continuous tone: audio alone dropped nothing; the same audio alongside a
+  # screen capture dropped three times and lost 1.09s in fourteen. Those holes
+  # are what came out as the description breaking up mid-word.
+  #
+  # So the picture is captured losslessly and cheaply (ultrafast, qp 0, niced)
+  # and encoded properly afterwards, when nothing is listening any more.
+  vraw="${out%.mov}.vraw.mov"
+  araw="${out%.mov}.araw.wav"
+  nice -n 15 ffmpeg -hide_banner -loglevel error \
     -f avfoundation -capture_cursor 0 -pixel_format uyvy422 \
-    -i "${SCREEN_DEV}:${aid:-0}" \
-    -t "$dur" \
-    -vf "crop=${rect},scale=1920:-2,fps=30" \
-    -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
-    -c:a aac -b:a 192k -ar 48000 \
-    "$out" </dev/null 2>/dev/null &
+    -i "${SCREEN_DEV}:none" -t "$dur" \
+    -vf "crop=${rect},fps=30" \
+    -c:v libx264 -preset ultrafast -qp 0 -pix_fmt yuv420p \
+    "$vraw" </dev/null 2>/dev/null &
+  vf=$!
+  ffmpeg -hide_banner -loglevel error \
+    -f avfoundation -i ":${aid:-0}" -t "$dur" \
+    -c:a pcm_s16le "$araw" </dev/null 2>/dev/null &
   ff=$!
 
   # Only start counting once there are bytes on disk.
   if [ -n "$key" ] || [ -n "${ON_START:-}" ]; then
-    for i in $(seq 1 60); do [ -s "$out" ] && break; sleep 0.25; done
+    for i in $(seq 1 60); do [ -s "$araw" ] && break; sleep 0.25; done
   fi
 
   # Anything that has to happen ON CAMERA from its first frame goes here, not
@@ -282,6 +295,15 @@ capture() {
     ok "pressed (key $key)"
   fi
   wait "$ff"
+  wait "$vf" 2>/dev/null
+
+  # Encode for real now that the capture is over.
+  ffmpeg -hide_banner -loglevel error -y -i "$vraw" -i "$araw" \
+    -map 0:v:0 -map 1:a:0 \
+    -vf "scale=1920:-2" \
+    -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p \
+    -c:a aac -b:a 192k -ar 48000 -shortest "$out" 2>/dev/null
+  rm -f "$vraw" "$araw"
 
   # The crop is a fixed screen rectangle, so anything brought forward over the
   # device lands in the take and nothing complains. Two takes here were quietly

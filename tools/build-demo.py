@@ -117,7 +117,14 @@ def card_end(path):
 T = lambda n: os.path.join(TAKES, n)
 S1 = T("scene-1-gap-145644.mov")
 S2 = T("scene-2-generation-152402.mov")
-S3 = T("scene-3-described-145903.mov")
+# Recorded by hand rather than by the script. macOS screen recording does not
+# starve its audio the way a single ffmpeg capturing screen-and-audio does:
+# this one decodes 17.10s of audio for a 17.13s container, against roughly 10%
+# short on the scripted takes. Cut at an offset of +5.0s, established by
+# finding the frame where the caption changes from the 85.01 cue to the 90.27
+# cue -- audio correlation could not lock on and its answer of +1.7s put the
+# wrong line on screen.
+S3 = T("scene-3-described-user.mov")
 S4TV = T("scene-4tv-handoff-150051.mov")
 S4P = T("scene-4phone-clean.mov")
 S5 = T("scene-5-plate-150309.mov")
@@ -146,18 +153,18 @@ EDIT = [
     ("s06", "CARD:later", 0, 2.0, [],                             0.0),
     # 14.9, not 14.0: a description runs 13.24-14.61 in this take and cutting
     # at 14.0 sliced it mid-word -- which is the break at 1:14 in the first cut.
-    ("s07", S3,   0.0, 14.9,  [("05_same", 0.5)],                 1.0),
+    ("s07", S3,   0.0, 17.1,  [("05_same", 0.5)],                 1.0),
     # after the handoff announcement, not over it.
-    ("s08", S4TV, 0.0, 17.0,  [("06_tworoom", 8.0)],              0.85),
+    ("s08", S4TV, 0.0, 16.2,  [("06_tworoom", 8.0)],              0.85),
     # the answer starts 6.5s in; this has to be finished before it.
-    ("s09", S4P,  0.0, 18.0,  [("07b_ask", 0.2)],                 1.0),
+    ("s09", S4P,  0.0, 17.5,  [("07b_ask", 0.2)],                 1.0),
     ("s10", S5,  23.2, 38.0,  [("09_reviewers", 0.3), ("10_dave", 7.7),
                                ("11_watcher", 18.2), ("12_credit", 27.9),
                                ("13_measured", 36.0)],            0.16),
     ("s11", "CARD:table", 0, 13.5, [("14_table", 0.3)],           0.0),
     ("s12", S5,  62.0,  5.0,  [("15_limit", 0.3)],                0.16),
     ("s13", "CARD:close", 0, 6.3, [("16_close", 0.3)],            0.0),
-    ("s14", "CARD:end", 0, 3.0, [("17_name", 0.3)],               0.0),
+    ("s14", "CARD:end", 0, 2.0, [("17_name", 0.3)],               0.0),
 ]
 
 TAIL = 0.45          # breathing room after the last line in a segment
@@ -184,11 +191,11 @@ MUSIC_FROM = 60.0        # past the opening ramp
 #   s07  the described passage. This is the exhibit.
 #   s09  the phone answering a question. Also the exhibit.
 MUSIC_DB = {
-    "s01": None,   "s02": -34.0, "s03": -34.0, "s04": -30.0,
-    "s05": -38.0,  # the app narrating itself; present, never competing
-    "s06": -26.0,  # a card with nothing spoken over it
-    "s07": None,   "s08": -36.0, "s09": None,  "s10": -34.0,
-    "s11": -30.0,  "s12": -34.0, "s13": -30.0, "s14": -26.0,
+    "s01": None,   "s02": -41.0, "s03": -41.0, "s04": -37.0,
+    "s05": -45.0,  # the app narrating itself; present, never competing
+    "s06": -33.0,  # a card with nothing spoken over it
+    "s07": None,   "s08": -43.0, "s09": None,  "s10": -41.0,
+    "s11": -37.0,  "s12": -41.0, "s13": -37.0, "s14": -33.0,
 }
 RAMP = 0.9               # seconds to fade in or out of a region
 
