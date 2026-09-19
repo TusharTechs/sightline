@@ -360,11 +360,34 @@ class Handler(BaseHTTPRequestHandler):
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
-        self.wfile.write(body)
+        # A HEAD is the same response without the body. Content-Length above
+        # still describes what a GET would return, which is what a HEAD is for.
+        if not getattr(self, "_head_only", False):
+            self.wfile.write(body)
 
     def do_OPTIONS(self):
         self._send(204, b"", extra={"Access-Control-Allow-Headers": "Content-Type",
-                                    "Access-Control-Allow-Methods": "GET,POST,OPTIONS"})
+                                    "Access-Control-Allow-Methods": "GET,HEAD,POST,OPTIONS"})
+
+    def do_HEAD(self):
+        """Answer HEAD, because the phone asks with it before it plays anything.
+
+        The companion never implemented this, so BaseHTTPRequestHandler replied
+        501 to every one. The phone probes each clip with
+        `fetch(url, {method: 'HEAD'})` to choose between the small mp3 and the
+        wav, takes a not-ok response to mean neither exists, and quietly plays
+        nothing -- no error, no log line, the description list simply stays
+        empty while the position counter keeps ticking over perfectly.
+
+        Static hosting answers HEAD for free, so the standalone pages were
+        always fine and only the local service -- the co-viewing path, the one
+        with a phone following a television -- was mute.
+        """
+        self._head_only = True
+        try:
+            self.do_GET()
+        finally:
+            self._head_only = False
 
     def do_POST(self):
         if self.path == "/generate":
