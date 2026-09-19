@@ -12,8 +12,6 @@ listening to.
 """
 import json, os, subprocess, sys
 from PIL import Image, ImageDraw, ImageFont
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from repair_dropouts import repair as repair_dropouts
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TAKES = os.path.expanduser("~/Desktop/sightline-takes")
@@ -199,15 +197,21 @@ def build():
         else:
             # Pull the bed out first, put the timestamps back, and fill the
             # dropouts before it goes anywhere near the mix.
-            raw, fixed = f"{SEGS}/{name}_raw.wav", f"{SEGS}/{name}_bed.wav"
+            # aresample only. Nothing is "repaired" here any more.
+            #
+            # A previous version hunted short silences with speech either side
+            # and filled them, on the theory that they were capture dropouts.
+            # They were not: a 12s continuous tone through the same path came
+            # back with one dropout, and the 101 found across the cut all sat
+            # in the 80-120ms band, which is where ordinary gaps between words
+            # live. So it was filling real pauses with copies of the
+            # neighbouring syllables -- which is what an echo is.
+            bed_wav = f"{SEGS}/{name}_bed.wav"
             run(["ffmpeg", "-hide_banner", "-v", "error", "-y",
                  "-ss", f"{start}", "-t", f"{length}", "-i", src, "-vn",
                  "-af", "aresample=async=1:first_pts=0",
-                 "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", raw])
-            n_fixed = repair_dropouts(raw, fixed)
-            if n_fixed:
-                print(f"        {name}: filled {n_fixed} dropout(s)")
-            cmd += ["-ss", f"{start}", "-t", f"{length}", "-i", src, "-i", fixed]
+                 "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", bed_wav])
+            cmd += ["-ss", f"{start}", "-t", f"{length}", "-i", src, "-i", bed_wav]
             vidx, aidx = "0:v", "1:a"
 
         filters = [f"[{vidx}]{fit}[v]"]
