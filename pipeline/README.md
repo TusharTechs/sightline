@@ -145,7 +145,6 @@ blocked.
 
 Output is **16-bit 48 kHz stereo interleaved PCM**, which is what
 `AudioPlaybackStream.writeAsync()` takes on Vega. Never MP3 — all decoding
-happens here, never on the device. See `HANDOFF.md` and `probes/`.
 
 ## Fit-the-gaps: what the speed test actually showed
 
