@@ -167,7 +167,9 @@ EDIT = [
     ("s14", "CARD:end", 0, 2.0, [("17_name", 0.3)],               0.0),
 ]
 
-TAIL = 0.45          # breathing room after the last line in a segment
+TAIL = 0.45
+VFADE = 0.38          # dip through black where the picture jumps
+AFADE = 0.22          # shorter, so nothing spoken gets clipped          # breathing room after the last line in a segment
 LIMIT = 180.0        # the rules say under three minutes
 
 
@@ -286,18 +288,51 @@ def build():
     for name, src, start, min_len, vos, bed in EDIT:
         need = max([vo_at + dur(f"{VO}/{vo}.mp3") + TAIL for vo, vo_at in vos],
                    default=0.0)
-        plan.append((name, src, start, round(max(min_len, need), 2), vos, bed))
+        length = round(max(min_len, need), 2)
+        # Chain consecutive pieces of the same shot. A segment's length is
+        # driven by its narration, so it rarely ends exactly where the next
+        # one was written to start -- s02 ran to 8.4s while s03 began at 8.2,
+        # repeating a fifth of a second and, worse, reading as a jump so the
+        # transition logic dipped to black in the middle of one continuous
+        # shot. Snap the start instead.
+        if plan:
+            pname, psrc, pstart, plen, _pv, _pb = plan[-1]
+            if psrc == src and abs(start - (pstart + plen)) < 1.0:
+                start = round(pstart + plen, 2)
+        plan.append((name, src, start, length, vos, bed))
     total = sum(p[3] for p in plan)
     print(f"  planned runtime {total:.1f}s" +
           ("" if total <= LIMIT else f"  OVER the {LIMIT:.0f}s limit by {total-LIMIT:.1f}s"))
     if total > LIMIT:
         sys.exit("refusing to build a cut that breaks the rule")
 
+    # A cut is only invisible when the next shot carries on from this one.
+    # Everywhere else the picture jumps -- at 78s it went backwards 25 seconds
+    # in the film mid-scene, which reads as a glitch rather than an edit. Dip
+    # through black at every boundary that is not a continuation, so the move
+    # is something the viewer is told about rather than something they catch.
+    def continues(prev, cur):
+        if prev is None:
+            return False
+        pname, psrc, pstart, plen, _v, _b = prev
+        cname, csrc, cstart, clen, _v2, _b2 = cur
+        if str(psrc).startswith("CARD:") or str(csrc).startswith("CARD:"):
+            return False
+        return psrc == csrc and abs(cstart - (pstart + plen)) < 0.05
+
     parts = []
-    for name, src, start, length, vos, bed in plan:
+    for idx, (name, src, start, length, vos, bed) in enumerate(plan):
+        prev = plan[idx - 1] if idx else None
+        nxt = plan[idx + 1] if idx + 1 < len(plan) else None
+        fade_in = not continues(prev, plan[idx])
+        fade_out = nxt is None or not continues(plan[idx], nxt)
         out = f"{SEGS}/{name}.mov"
         fit = (f"scale={W}:{H}:force_original_aspect_ratio=decrease,"
                f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=0x0b0f14,fps=30,setsar=1")
+        if fade_in:
+            fit += f",fade=t=in:st=0:d={VFADE}:color=0x0b0f14"
+        if fade_out:
+            fit += f",fade=t=out:st={max(0.0, length - VFADE):.3f}:d={VFADE}:color=0x0b0f14"
         cmd = ["ffmpeg", "-hide_banner", "-v", "error", "-y"]
         if str(src).startswith("CARD:"):
             cmd += ["-loop", "1", "-t", f"{length}", "-i",
@@ -346,8 +381,13 @@ def build():
             idx = base + i
             amix.append(f"[{idx}:a]adelay={int(at*1000)}|{int(at*1000)},volume=1.35[vo{i}]")
             labels.append(f"[vo{i}]")
+        afades = ""
+        if fade_in:
+            afades += f",afade=t=in:st=0:d={AFADE}"
+        if fade_out:
+            afades += f",afade=t=out:st={max(0.0, length - AFADE):.3f}:d={AFADE}"
         amix.append(f"{''.join(labels)}amix=inputs={len(labels)}:dropout_transition=0:"
-                    f"normalize=0,atrim=0:{length},asetpts=N/SR/TB[a]")
+                    f"normalize=0,atrim=0:{length},asetpts=N/SR/TB{afades}[a]")
         cmd += ["-filter_complex", ";".join(filters + amix),
                 "-map", "[v]", "-map", "[a]",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
