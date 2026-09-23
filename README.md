@@ -394,10 +394,33 @@ most blind and partially sighted viewers prefer the cinematic style, so
 
 Reproduce the first two:
 
+The frames are not in the repository, because they are generated rather than
+authored: `scene.html` is a pure function of `?t=`, so re-rendering gives
+byte-identical frames. Render them first. This needs Chrome or Chromium and
+no network, model or AWS account:
+
 ```bash
 cd pipeline
+fixtures/walkthrough/render.sh
 .venv/bin/python src/detect_changes.py fixtures/walkthrough/frames --fps 8 --out out/changes.json
+.venv/bin/python src/evaluate.py fixtures/walkthrough/ground-truth.json --changes out/changes.json
+```
+
+```
+DETECTION   9/9 ground-truth changes found   (0 extra not in ground truth)
+```
+
+The salience figures need one model call per change, so they need a key:
+
+```bash
+.venv/bin/python src/salience.py fixtures/walkthrough/frames out/changes.json --fps 8 --out out/judged.json
 .venv/bin/python src/evaluate.py fixtures/walkthrough/ground-truth.json --judged out/judged.json
+```
+
+```
+SALIENCE    correct on 9/9 matched events
+            precision 1.00 (spoke when it shouldn't: 0)
+            recall    1.00 (stayed silent when it mattered: 0)
 ```
 
 **Honest caveat, stated because it matters:** that fixture is synthetic and we
@@ -448,9 +471,11 @@ Everything here runs on **macOS, Linux and Windows**. The pipeline and the
 companion service are plain Python with no platform specific calls, and the app
 is built with the Vega CLI, which Amazon ships for all three.
 
-The only macOS specific things in this repository are the two scripts in
-`tools/` used to record the demo video. They are not needed to run, build or
-evaluate anything.
+The macOS specific things in this repository are the scripts in `tools/` used
+to record the demo video. They are not needed to run, build or evaluate
+anything. The fixture renderers under `pipeline/fixtures/` look for Chrome or
+Chromium in the usual place for each platform, and take a `CHROME=` override
+if yours lives somewhere else.
 
 ### What you need
 

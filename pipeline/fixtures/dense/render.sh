@@ -11,7 +11,26 @@
 # rendered once and then left alone.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+# Chrome or Chromium, wherever this platform keeps it.
+# Override with CHROME=/path/to/chrome if it lives somewhere unusual.
+if [ -z "${CHROME:-}" ]; then
+  for _c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+            "/Applications/Chromium.app/Contents/MacOS/Chromium" \
+            "${LOCALAPPDATA:-}/Google/Chrome/Application/chrome.exe" \
+            "/c/Program Files/Google/Chrome/Application/chrome.exe" \
+            "/c/Program Files (x86)/Google/Chrome/Application/chrome.exe"; do
+    [ -x "$_c" ] && { CHROME="$_c"; break; }
+  done
+fi
+if [ -z "${CHROME:-}" ]; then
+  for _c in google-chrome google-chrome-stable chromium chromium-browser chrome; do
+    command -v "$_c" >/dev/null 2>&1 && { CHROME="$(command -v "$_c")"; break; }
+  done
+fi
+[ -n "${CHROME:-}" ] || {
+  echo "No Chrome or Chromium found. Install one, or set CHROME=/path/to/chrome" >&2
+  exit 1
+}
 FPS="${FPS:-8}"
 DUR="${DUR:-24.0}"
 OUT="$HERE/frames"
