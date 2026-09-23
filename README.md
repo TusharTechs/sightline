@@ -290,7 +290,7 @@ media server, so the description channel was never blocked by the bug above.
 
 **Speech detection, not silence detection.** Looking for silence finds 2.5
 usable seconds in a 52-second trailer, because the score never stops. Detecting
-*speech* and treating everything else as available finds **42.9 seconds**. A 17x
+*speech* and treating everything else as available finds **39.8 seconds**. A 16x
 difference, and the reason is that describers talk over music all the time â€”
 what they avoid is dialogue.
 
@@ -584,7 +584,7 @@ description essentially impossible. But describers talk over music constantly â€
 what they avoid is dialogue.
 
 Transcribe's word-level timestamps give the speech intervals directly;
-everything else is available. **2.5 seconds became 42.9.** A 17x difference, and
+everything else is available. **2.5 seconds became 39.8.** A 16x difference, and
 the single most consequential correction in the project.
 
 It also returns the dialogue text, which is fed to the model so a description
