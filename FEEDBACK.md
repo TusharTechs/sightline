@@ -50,10 +50,13 @@ Priority: Critical.**
 `Error 002: Access to Bedrock models is not allowed for this account` gives a
 developer nothing to act on. It was returned in every region, for every model,
 with bare model IDs and both inference profile forms, while S3, Polly and
-Transcribe worked on the same credentials in the same session. The real cause,
-`agreementAvailability: NOT_AVAILABLE`, is visible only from
-`get-foundation-model-availability`, which you have to already know exists. The
-per model toggle in the console does not clear it.
+Transcribe worked on the same credentials in the same session. There is
+nothing to act on: the account is not in an Organization, and
+`get-foundation-model-availability` reports every field positive, including
+`agreementAvailability: AVAILABLE`. The control plane says access is granted
+while the data plane refuses, and the per model toggle in the console does not
+clear it. Whatever flag produces Error 002 is invisible through every API a
+customer can call. Re-checked 23 September 2026 across five regions.
 *Why it matters to us:* Bedrock was the planned model backend. The client is
 written and shipped in the repository and has never run. We shipped against a
 direct model API instead, which is a worse outcome for Amazon than for us.
