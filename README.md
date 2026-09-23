@@ -396,8 +396,10 @@ Reproduce the first two:
 
 The frames are not in the repository, because they are generated rather than
 authored: `scene.html` is a pure function of `?t=`, so re-rendering gives
-byte-identical frames. Render them first. This needs Chrome or Chromium and
-no network, model or AWS account:
+byte-identical frames, which is verified: a fresh clone re-rendered all 88 and
+every one matched the original byte for byte. Render them first. This needs
+Chrome or Chromium and no network, model or AWS account, and takes about three
+minutes because it launches one headless Chrome per frame:
 
 ```bash
 cd pipeline
