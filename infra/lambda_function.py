@@ -101,6 +101,15 @@ def build_context(timeline, transcript, t):
     return "\n\n".join(parts)
 
 
+class ModelRefused(Exception):
+    """The model service answered, and said no.
+
+    Distinct from the function falling over, and the difference is the whole
+    point of reporting it: a judge hitting a 500 cannot tell a broken
+    deployment from a model that declined the request.
+    """
+
+
 def ask_model(frame_jpg, question, context):
     body = {
         "model": MODEL,
@@ -119,8 +128,20 @@ def ask_model(frame_jpg, question, context):
         headers={"content-type": "application/json",
                  "anthropic-version": "2023-06-01",
                  "x-api-key": os.environ["ANTHROPIC_API_KEY"]})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        out = json.loads(r.read())
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            out = json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        # Read the body. Without this a 400 from the model surfaces as
+        # "Internal Server Error" and nobody can say why, which is how this
+        # endpoint sat failing. The key is not in the body and is never logged.
+        try:
+            detail = json.loads(e.read()).get("error", {})
+            msg = f"{detail.get('type', e.code)}: {detail.get('message', '')}"
+        except Exception:
+            msg = f"HTTP {e.code}"
+        print(f"[ask] model refused: {msg}")
+        raise ModelRefused(msg) from None
     return "".join(b.get("text", "") for b in out.get("content", [])).strip()
 
 
@@ -142,16 +163,29 @@ def _reply(code, payload):
             "body": json.dumps(payload)}
 
 
-def _health():
-    """Is this deployment actually able to answer?
+def _health(probe=False):
+    """What this deployment can and cannot currently do.
 
-    A judge should not have to POST a question and read a model answer to find
-    out whether the endpoint is up. This says which pieces are configured
-    without calling either paid service, and without ever reporting the key
-    itself: only whether one is present.
+    A judge should not have to POST a question to find out whether the
+    endpoint is up. But a cheap check can only see configuration, and
+    configuration being right is not the same as the thing working: this
+    reported "ok" for a week while every question was being refused, because
+    the workspace had hit a spend limit the check could not see.
+
+    So the cheap answer says exactly what it checked, and `?probe=1` spends one
+    very small model call to answer the question it cannot otherwise answer.
     """
     ok_key = bool(os.environ.get("ANTHROPIC_API_KEY")
                   or os.environ.get("SIGHTLINE_KEY_SECRET_ARN"))
+    model_state = "not checked, pass ?probe=1 to actually try it"
+    if probe and ok_key:
+        try:
+            ask_model(b"", "ping", "")
+            model_state = "answering"
+        except ModelRefused as e:
+            model_state = f"refusing: {str(e)[:160]}"
+        except Exception as e:
+            model_state = f"unreachable: {type(e).__name__}"
     reachable = {}
     for name, path in VIDEOS.items():
         try:
@@ -159,10 +193,14 @@ def _health():
             reachable[name] = "ok"
         except Exception as e:
             reachable[name] = f"unreachable: {type(e).__name__}"
-    healthy = ok_key and all(v == "ok" for v in reachable.values())
+    configured = ok_key and all(v == "ok" for v in reachable.values())
+    healthy = configured and (not probe or model_state == "answering")
     return _reply(200 if healthy else 503, {
+        "checked": "configuration and content reachability"
+                   + (", and the model itself" if probe else ""),
         "status": "ok" if healthy else "degraded",
         "model_key": "configured" if ok_key else "missing",
+        "model": model_state,
         "voice": VOICE,
         "site": SITE,
         "timelines": reachable,
@@ -177,7 +215,8 @@ def lambda_handler(event, context):
                             "access-control-allow-headers": "content-type",
                             "access-control-allow-methods": "GET, POST, OPTIONS"}}
     if http.get("method") == "GET" or (http.get("path") or "").endswith("/health"):
-        return _health()
+        q = event.get("queryStringParameters") or {}
+        return _health(probe=str(q.get("probe", "")).lower() in ("1", "true", "yes"))
     try:
         data = json.loads(event.get("body") or "{}")
     except ValueError:
@@ -203,7 +242,11 @@ def lambda_handler(event, context):
         # Past the last extracted second, or the clip has no frame there.
         return _reply(404, {"error": "no frame for that moment"})
 
-    answer = ask_model(frame, question, build_context(timeline, transcript, t))
+    try:
+        answer = ask_model(frame, question, build_context(timeline, transcript, t))
+    except ModelRefused as e:
+        return _reply(502, {"error": "the model refused the request",
+                            "detail": str(e)[:300]})
     if not answer:
         return _reply(502, {"error": "no answer"})
 
