@@ -211,7 +211,8 @@ def _health(probe=False):
             ask_model(b"", "ping", "")
             model_state = "answering"
         except ModelRefused as e:
-            model_state = f"refusing: {str(e)[:160]}"
+            print(f"model refused on probe: {e}")   # detail to the log, not the caller
+            model_state = "refusing"
         except Exception as e:
             model_state = f"unreachable: {type(e).__name__}"
     reachable = {}
@@ -277,7 +278,10 @@ def lambda_handler(event, context):
         # Answer with what is known rather than with an error. Labelled, so
         # nobody mistakes a recap for the answer they asked for.
         answer = recap(timeline, transcript, t)
-        degraded = str(e)[:300]
+        # The upstream body can name the account, the workspace or the billing
+        # state, and this endpoint is public. Log the detail, publish the fact.
+        print(f"model refused: {e}")
+        degraded = True
     if not answer:
         return _reply(502, {"error": "no answer"})
 
@@ -285,7 +289,7 @@ def lambda_handler(event, context):
     if degraded:
         payload["answered_from"] = ("the descriptions and dialogue so far, not "
                                     "the frame: the model was unavailable")
-        payload["model_unavailable"] = degraded
+        payload["model_unavailable"] = "the model did not answer"
     try:
         payload["audio_mp3_b64"] = speak(answer)
     except Exception as e:                      # speech is a bonus, not the answer
