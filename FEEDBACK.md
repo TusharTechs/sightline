@@ -31,7 +31,21 @@ for each is in the friction log entry named beside it.
 
 ### A. AWS services
 
-**A1. Bedrock: an error that names the missing agreement.
+**A1. Bedrock: an error that names the actual cause.
+Priority: Critical.**
+
+*Re-tested 23 September 2026, and the picture is now sharper and worse.* Two
+Claude models and all sixteen Amazon Nova models report
+`agreementAvailability: AVAILABLE` and `authorizationStatus: AUTHORIZED`. Every
+`InvokeModel` still fails with `Error 002`, in **us-east-1, us-west-2,
+eu-central-1, ap-south-1 and ap-northeast-1**, including Amazon's own
+`amazon.nova-pro-v1:0` and `amazon.nova-lite-v1:0`. So the agreement is no
+longer the cause, the error text has not changed, and there is now nothing at
+all in any API response that tells a developer what is wrong or what to do.
+S3, Polly, Transcribe, Lambda and CloudWatch all work on the same credentials
+in the same session.
+
+**A1. Bedrock: the original finding, for the record.
 Priority: Critical.**
 `Error 002: Access to Bedrock models is not allowed for this account` gives a
 developer nothing to act on. It was returned in every region, for every model,

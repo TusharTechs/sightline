@@ -101,6 +101,34 @@ def build_context(timeline, transcript, t):
     return "\n\n".join(parts)
 
 
+def recap(timeline, transcript, t, limit=3):
+    """What has been described and said around this moment, without a model.
+
+    The model is not always there. It was refused for a fortnight because a
+    workspace spend limit had been reached, and Bedrock is blocked on this
+    account entirely. A blind viewer who asks a question and gets an error has
+    been handed nothing, which is the state this whole project exists to
+    remove.
+
+    So when the model will not answer, say what is actually known: the last few
+    descriptions and the last few lines of dialogue before this second. It is
+    not an answer and it is never presented as one. It is the difference
+    between "I cannot help" and "here is what you have been told so far".
+    """
+    said = [c for c in sorted(timeline["cues"], key=lambda c: c["t"]) if c["t"] <= t]
+    spoken = dialogue_up_to(transcript, t)
+    bits = []
+    if said:
+        recent = said[-limit:]
+        bits.append("Described so far: " + " ".join(c["text"] for c in recent))
+    if spoken:
+        recent = spoken[-limit:]
+        bits.append("Said so far: " + " ".join(tx for _, tx in recent))
+    if not bits:
+        return "Nothing has been described or said yet at this point."
+    return " ".join(bits)
+
+
 class ModelRefused(Exception):
     """The model service answered, and said no.
 
@@ -242,15 +270,22 @@ def lambda_handler(event, context):
         # Past the last extracted second, or the clip has no frame there.
         return _reply(404, {"error": "no frame for that moment"})
 
+    degraded = None
     try:
         answer = ask_model(frame, question, build_context(timeline, transcript, t))
     except ModelRefused as e:
-        return _reply(502, {"error": "the model refused the request",
-                            "detail": str(e)[:300]})
+        # Answer with what is known rather than with an error. Labelled, so
+        # nobody mistakes a recap for the answer they asked for.
+        answer = recap(timeline, transcript, t)
+        degraded = str(e)[:300]
     if not answer:
         return _reply(502, {"error": "no answer"})
 
     payload = {"answer": answer, "asked_at": round(t, 2)}
+    if degraded:
+        payload["answered_from"] = ("the descriptions and dialogue so far, not "
+                                    "the frame: the model was unavailable")
+        payload["model_unavailable"] = degraded
     try:
         payload["audio_mp3_b64"] = speak(answer)
     except Exception as e:                      # speech is a bonus, not the answer
