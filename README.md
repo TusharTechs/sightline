@@ -387,6 +387,7 @@ most blind and partially sighted viewers prefer the cinematic style, so
 | Applies the salience rule correctly | precision **1.00**, recall **1.00** |
 | Fits descriptions to the gap at speed | verified by synthesis at 1x, 1.5x, 2x — nothing time-compressed |
 | Finds describable time in real film | **39.8s** of a 52s trailer, vs 2.5s by silence detection |
+| Never speaks over the dialogue | **0.000s** of overlap in `sintel-described-1.0x.mp4`; the closest description starts **0.70s** after the line before it |
 | Costs little to run | **$0.042** of AWS per minute of film, **$0.0046** per description |
 | Plays video on Fire TV | MSE reaches `canplay` → `playing`, audio audible |
 | Plays description concurrently | PCM on an accessibility stream, ducking confirmed |
@@ -403,6 +404,25 @@ cd pipeline
 wrote it, so a perfect score shows the pipeline implements the rule faithfully —
 not that the rule generalises. The film results are on real footage; the
 walkthrough results are not.
+
+### Timing, measured against the film rather than asserted
+
+The one thing audio description must never do is talk over the dialogue.
+Every description in `sintel-described-1.0x.mp4` was measured against
+Transcribe's word timings for the same film:
+
+| | |
+|---|---|
+| descriptions | 8 |
+| overlapping a spoken word | **0**, totalling **0.000s** |
+| closest start after a line ends | **0.70s** |
+| closest finish before the next line | 0.42s |
+| speech placed / gap available | 26.3s / 39.8s |
+
+The 0.70s is not slack left over, it is the guard band in
+`pipeline/src/detect_speech.py`, and it exists because a blind reviewer
+missed a line of the film when description followed it after 0.15s. The
+pause after someone speaks is when the listener understands them.
 
 ### What a described minute costs
 
