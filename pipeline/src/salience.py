@@ -141,6 +141,21 @@ def _client(flavour="mantle"):
     return _clients[flavour]
 
 
+def _anthropic():
+    """The shared Anthropic client, built on first use.
+
+    The import lives inside the `if`, not above it. Importing a vendor SDK to
+    then not use it makes every function in this module require that SDK
+    installed, including the pure logic around it -- which is how the test
+    suite ended up needing `anthropic` to check that a continuity repair
+    respects its word budget.
+    """
+    if "anthropic" not in _clients:
+        import anthropic
+        _clients["anthropic"] = anthropic.Anthropic()
+    return _clients["anthropic"]
+
+
 def _judgement_request(before_png, after_png, max_words, scroll_dy=0):
     """The request both backends send.
 
@@ -202,9 +217,7 @@ def judge_anthropic(before_png, after_png, max_words=14, effort=None, scroll_dy=
 
     Used while this AWS account cannot reach Bedrock. Needs ANTHROPIC_API_KEY.
     """
-    import anthropic
-    if "anthropic" not in _clients:
-        _clients["anthropic"] = anthropic.Anthropic()
+    _anthropic()
     kwargs = _judgement_request(before_png, after_png, max_words, scroll_dy)
     kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     if effort:
@@ -314,10 +327,7 @@ def describe_at_budget(changed, max_words, backend="anthropic"):
         kwargs["model"] = BEDROCK_MODEL
         client = _client("legacy" if backend.endswith("legacy") else "mantle")
     else:
-        import anthropic
-        if "anthropic" not in _clients:
-            _clients["anthropic"] = anthropic.Anthropic()
-        client = _clients["anthropic"]
+        client = _anthropic()
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     return client.messages.parse(**kwargs).parsed_output.description
 
@@ -377,10 +387,7 @@ def rank_changes(changes, backend="anthropic"):
         kwargs["model"] = BEDROCK_MODEL
         client = _client("legacy" if backend.endswith("legacy") else "mantle")
     else:
-        import anthropic
-        if "anthropic" not in _clients:
-            _clients["anthropic"] = anthropic.Anthropic()
-        client = _clients["anthropic"]
+        client = _anthropic()
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     return [r.model_dump()
             for r in client.messages.parse(**kwargs).parsed_output.ranked]
@@ -540,10 +547,7 @@ def describe_film_change(before_png, after_png, max_words, dialogue="",
         kwargs["model"] = BEDROCK_MODEL
         client = _client("legacy" if backend.endswith("legacy") else "mantle")
     else:
-        import anthropic
-        if "anthropic" not in _clients:
-            _clients["anthropic"] = anthropic.Anthropic()
-        client = _clients["anthropic"]
+        client = _anthropic()
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     return client.messages.parse(**kwargs).parsed_output.model_dump()
 
@@ -604,10 +608,7 @@ def rank_film_cues(cues, backend="anthropic"):
         kwargs["model"] = BEDROCK_MODEL
         client = _client("legacy" if backend.endswith("legacy") else "mantle")
     else:
-        import anthropic
-        if "anthropic" not in _clients:
-            _clients["anthropic"] = anthropic.Anthropic()
-        client = _clients["anthropic"]
+        client = _anthropic()
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     out = [r.model_dump() for r in client.messages.parse(**kwargs).parsed_output.ranked]
     for r in out:
@@ -675,10 +676,7 @@ def onset_has_visible_cause(before_png, after_png, backend="anthropic"):
         kwargs["model"] = BEDROCK_MODEL
         client = _client("legacy" if backend.endswith("legacy") else "mantle")
     else:
-        import anthropic
-        if "anthropic" not in _clients:
-            _clients["anthropic"] = anthropic.Anthropic()
-        client = _clients["anthropic"]
+        client = _anthropic()
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
     return client.messages.parse(**kwargs).parsed_output.model_dump()
 
@@ -743,10 +741,7 @@ def make_continuous(descriptions, budgets, backend="anthropic", effort=None):
         kwargs["model"] = BEDROCK_MODEL
         client = _client("legacy" if backend.endswith("legacy") else "mantle")
     else:
-        import anthropic
-        if "anthropic" not in _clients:
-            _clients["anthropic"] = anthropic.Anthropic()
-        client = _clients["anthropic"]
+        client = _anthropic()
         kwargs["model"] = os.environ.get("SIGHTLINE_API_MODEL", "claude-opus-5")
 
     fixed = list(descriptions)
