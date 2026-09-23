@@ -11,6 +11,11 @@
 
 Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 
+[![tests](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml/badge.svg)](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml)
+[![92 tests](https://img.shields.io/badge/tests-92%20passing-success)](#what-is-tested-and-why)
+[![Linux · macOS · Windows](https://img.shields.io/badge/runs%20on-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-informational)](#run-it)
+[![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+
 <br>
 
 [**▶ Demo video (3 min)**](https://youtu.be/vqJsFDnj7ko) &nbsp;·&nbsp;
@@ -21,6 +26,7 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 [**Architecture**](#architecture) &nbsp;·&nbsp;
 [**Evidence**](#evidence) &nbsp;·&nbsp;
 [**AWS**](#aws-integration) &nbsp;·&nbsp;
+[**Tests**](#what-is-tested-and-why) &nbsp;·&nbsp;
 [**Where AI is used**](#where-ai-is-used-and-where-it-is-not) &nbsp;·&nbsp;
 [**Why it works this way**](#how-we-knew-what-to-build) &nbsp;·&nbsp;
 [**Limitations**](#limitations)
@@ -488,6 +494,37 @@ Down moves description to the phone · Menu speaks the controls.
 runs the same timeline and the same generated audio in any browser, on any
 operating system. Press **Play with description**.
 </details>
+
+---
+
+## What is tested, and why
+
+92 tests. Each one locks a behaviour this project argues for, or a fault a
+blind reviewer found. None of them need AWS, a Fire TV or a network.
+
+```bash
+python -m pytest pipeline/tests -q        # 77
+cd app && npm test                        # 15
+```
+
+| what it protects | why it exists |
+|---|---|
+| **Gaps come from speech, not silence** | Looking for quiet found 2.5 usable seconds in a 52 second trailer because the score never stops. Inverting detected speech found 39.8. The tests assert gaps never land inside dialogue, never overlap, and do not depend on how loud the film is |
+| **The word budget uses the measured rate** | We ask Polly for 170 wpm and it delivers 203. Budgeting at the requested rate overflowed every line. A test now fails if the two are ever reconciled the wrong way |
+| **A continuity repair cannot outgrow its gap** | The repair pass rewrites references across independently written lines. A better sentence that no longer fits is a line spoken over dialogue, so it is refused and the original kept |
+| **Preflight still catches the real faults** | Camera language, dialogue collisions, missing audio, a truncated film. And the inverse: an instructional film that narrates for nine minutes is not blamed for silence it never had room to fill |
+| **Attenuating the file does not move a classification** | The test a blind reviewer proposed. Every quantity is a difference between two levels, so a uniform gain must cancel. It did not, which is how the 16-bit clipping was found. Now asserted to 0.01 dB |
+| **Speed changes the depth, never the order** | *"What I can't live with is a different story at a different speed."* What survives at 2x must be a rank-ordered prefix of what survives at 1x. Asserted at 1.25x, 1.5x, 2x and 3x |
+
+CI runs the pipeline suite on **Linux, macOS and Windows** across two Python
+versions, because this README claims all three and a claim in a README is not
+a test.
+
+**Check the deployed endpoint without spending a model call:**
+
+```bash
+curl https://s4i9xx7htg.execute-api.us-east-1.amazonaws.com/health
+```
 
 ---
 
