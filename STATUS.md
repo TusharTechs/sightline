@@ -73,11 +73,24 @@ Two honest routes: describe it accurately, or wire generation to the app so the
 claim is visible. The second is stronger, because otherwise the generation — the
 part with all the work in it — never appears on screen.
 
-### 4. No blind user has actually used it.
+### 4. No blind user has operated the app.
 
-The reviewer has shaped the design through correspondence and has the clips, but has
-not played them yet. Nobody has operated the app or the phone. Every quality
-claim rests on my judgement and one fixture I wrote myself.
+Two blind reviewers have shaped the design through correspondence, and they
+have now listened to the rendered clips. Six faults came out of their review
+in total, all fixed. Two came specifically from listening:
+
+- A description arrived 0.15s after a line of dialogue ended, so the line
+  itself was missed. The pause after speech is now 0.7s.
+  See `pipeline/src/detect_speech.py`.
+- Description stopped just after two minutes of a three-minute clip. The cause
+  was `gaps[:max_cues]` truncating the film rather than capping the number of
+  descriptions. A cap now applies after ranking, so what survives is the most
+  needed description from anywhere in the film.
+  See `pipeline/src/film_cues.py`.
+
+What is still untested: nobody has operated the Fire TV app or the phone
+companion. Every claim about the app itself, as opposed to the clips it plays,
+rests on my judgement and one fixture I wrote myself.
 
 Saksham Trust and Score Foundation have not replied.
 
