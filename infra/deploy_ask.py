@@ -143,7 +143,26 @@ except ClientError as e:
 has_key = "ANTHROPIC_API_KEY" in lam.get_function_configuration(FunctionName=FN) \
     .get("Environment", {}).get("Variables", {})
 
-print("\nENDPOINT " + url["FunctionUrl"])
+# Print an endpoint only once it has been shown to answer. A function URL can
+# be configured correctly and still be refused, for instance by an account
+# level public access block, and an address that 403s is worse than none.
+endpoint = url["FunctionUrl"].rstrip("/")
+try:
+    import urllib.request
+    with urllib.request.urlopen(endpoint + "/health", timeout=20) as r:
+        reachable = r.status == 200
+except Exception:
+    reachable = False
+
+if reachable:
+    print("\nENDPOINT " + endpoint)
+else:
+    print("\nThe function URL exists but does not answer: " + endpoint)
+    print("  It is configured AuthType=NONE with public invoke permitted, so if")
+    print("  this persists the likely cause is an account level block on public")
+    print("  Lambda function URLs. Nothing is wrong with the function itself.")
+    print("  Put an HTTP API in front of it, as infra/template.yaml does, and")
+    print("  point clients at that instead.")
 if not has_key:
     print("""
 The model key is NOT set, and the endpoint will refuse to answer until it is.
