@@ -25,7 +25,7 @@ documentation page.
 
 ## Part 1: feature requests
 
-Sixteen requests, grouped by area and each with a priority. Every one came out
+Twenty-one requests, grouped by area and each with a priority. Every one came out
 of something that actually cost us time on this build, and the full reproduction
 for each is in the friction log entry named beside it.
 
@@ -45,23 +45,12 @@ all in any API response that tells a developer what is wrong or what to do.
 S3, Polly, Transcribe, Lambda and CloudWatch all work on the same credentials
 in the same session.
 
-**A1. Bedrock: the original finding, for the record.
-Priority: Critical.**
-`Error 002: Access to Bedrock models is not allowed for this account` gives a
-developer nothing to act on. It was returned in every region, for every model,
-with bare model IDs and both inference profile forms, while S3, Polly and
-Transcribe worked on the same credentials in the same session. There is
-nothing to act on: the account is not in an Organization, and
-`get-foundation-model-availability` reports every field positive, including
-`agreementAvailability: AVAILABLE`. The control plane says access is granted
-while the data plane refuses, and the per model toggle in the console does not
-clear it. Whatever flag produces Error 002 is invisible through every API a
-customer can call. Re-checked 23 September 2026 across five regions.
 *Why it matters to us:* Bedrock was the planned model backend. The client is
 written and shipped in the repository and has never run. We shipped against a
 direct model API instead, which is a worse outcome for Amazon than for us.
-*Ask:* name the missing agreement in the error, or surface agreement status
-beside the model in the console.
+*Ask:* make `Error 002` name the condition that produced it and how to clear
+it, or expose that condition somewhere a customer can reach. As it stands,
+nothing in any API response distinguishes this account from a working one.
 
 **A2. Transcribe: a direct upload path for short files.
 Priority: Important.**
@@ -160,7 +149,7 @@ samples as regression tests, and if it requires physical hardware, say so
 prominently in the VVD documentation. See FL-012.
 
 **C2. VoiceView on the virtual device.
-Priority: Critical for accessibility work.**
+Priority: Critical.**
 The documented shell method for enabling VoiceView on the VVD fails with a
 permission error. The developer shell does not have the privileges the
 documented instruction requires.
@@ -174,7 +163,7 @@ since it is a developer device by definition, or add
 FAQ to say the shell method cannot work on the VVD. See FL-011.
 
 **C3. Native crash symbolication for external developers.
-Priority: High.**
+Priority: Important.**
 Symbolicating a native crash requires Amazon internal authentication, so an
 external developer with a SIGSEGV has an unreadable stack and nowhere to go.
 *Why it matters to us:* a reference sample crashed on the virtual device and we
@@ -270,7 +259,7 @@ Priority: Nice-to-have.**
 
 **E4. A reference sample crashes with SIGSEGV on the virtual device, with two
 RCT-folly versions loaded.
-Priority: High.**
+Priority: Important.**
 *Why it matters to us:* combined with C3, an unreadable crash in Amazon's own
 sample is a dead end for an external developer. See FL-008.
 
