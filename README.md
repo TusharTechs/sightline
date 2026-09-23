@@ -387,6 +387,7 @@ most blind and partially sighted viewers prefer the cinematic style, so
 | Applies the salience rule correctly | precision **1.00**, recall **1.00** |
 | Fits descriptions to the gap at speed | verified by synthesis at 1x, 1.5x, 2x — nothing time-compressed |
 | Finds describable time in real film | **39.8s** of a 52s trailer, vs 2.5s by silence detection |
+| Costs little to run | **$0.042** of AWS per minute of film, **$0.0046** per description |
 | Plays video on Fire TV | MSE reaches `canplay` → `playing`, audio audible |
 | Plays description concurrently | PCM on an accessibility stream, ducking confirmed |
 
@@ -402,6 +403,22 @@ cd pipeline
 wrote it, so a perfect score shows the pipeline implements the rule faithfully —
 not that the rule generalises. The film results are on real footage; the
 walkthrough results are not.
+
+### What a described minute costs
+
+Measured on the same trailer, at us-east-1 list prices:
+
+| | per minute of film |
+|---|---|
+| Amazon Transcribe | $0.0240 |
+| Amazon Polly, generative | $0.0178 |
+| **AWS total** | **$0.0418** |
+| model layer | 28,920 input tokens (16 frames of 1280x720), 713 output |
+
+A 90 minute feature therefore costs **$3.76** in AWS services. The model layer
+is quoted in tokens rather than dollars because the price depends on which
+model you point it at, and the pipeline runs against Bedrock or a direct API
+without changing the tokens it sends.
 
 ---
 
