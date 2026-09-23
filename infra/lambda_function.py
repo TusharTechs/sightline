@@ -142,13 +142,42 @@ def _reply(code, payload):
             "body": json.dumps(payload)}
 
 
+def _health():
+    """Is this deployment actually able to answer?
+
+    A judge should not have to POST a question and read a model answer to find
+    out whether the endpoint is up. This says which pieces are configured
+    without calling either paid service, and without ever reporting the key
+    itself: only whether one is present.
+    """
+    ok_key = bool(os.environ.get("ANTHROPIC_API_KEY")
+                  or os.environ.get("SIGHTLINE_KEY_SECRET_ARN"))
+    reachable = {}
+    for name, path in VIDEOS.items():
+        try:
+            _get(f"{SITE}/{path}timeline.json")
+            reachable[name] = "ok"
+        except Exception as e:
+            reachable[name] = f"unreachable: {type(e).__name__}"
+    healthy = ok_key and all(v == "ok" for v in reachable.values())
+    return _reply(200 if healthy else 503, {
+        "status": "ok" if healthy else "degraded",
+        "model_key": "configured" if ok_key else "missing",
+        "voice": VOICE,
+        "site": SITE,
+        "timelines": reachable,
+    })
+
+
 def lambda_handler(event, context):
-    if (event.get("requestContext", {}).get("http", {}).get("method")
-            == "OPTIONS"):
+    http = event.get("requestContext", {}).get("http", {})
+    if http.get("method") == "OPTIONS":
         return {"statusCode": 204,
                 "headers": {"access-control-allow-origin": "*",
                             "access-control-allow-headers": "content-type",
-                            "access-control-allow-methods": "POST, OPTIONS"}}
+                            "access-control-allow-methods": "GET, POST, OPTIONS"}}
+    if http.get("method") == "GET" or (http.get("path") or "").endswith("/health"):
+        return _health()
     try:
         data = json.loads(event.get("body") or "{}")
     except ValueError:

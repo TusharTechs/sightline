@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+
+# The question answering endpoint, as infrastructure rather than as a script.
+#
+# infra/deploy_ask.py created the same resources imperatively and is kept
+# because it is what was actually used during the hackathon, and because it
+# deliberately never touches the API key. This template is the reproducible
+# form: a judge, or anyone else, can stand the whole thing up in one command
+# without reading a deploy script to find out what it makes.
+#
+#   sam deploy --guided --stack-name sightline-ask \
+#     --capabilities CAPABILITY_IAM
+#
+# The model key is NOT in here and must never be. Set it afterwards, out of
+# shell history, either in the Lambda console or by pointing
+# AnthropicApiKeySecret at a Secrets Manager secret you already hold.
+
+Description: >
+  Sightline: the ask endpoint. Answers a question about the moment a viewer is
+  on, from the frame on screen plus the dialogue and descriptions so far.
+
+Parameters:
+  SiteUrl:
+    Type: String
+    Default: https://tushartechs.github.io/sightline
+    Description: Where the timelines and media are served from.
+  ModelId:
+    Type: String
+    Default: claude-opus-5
+  PollyVoice:
+    Type: String
+    Default: Ruth
+    Description: A different voice from the narration, so the two are never confused.
+  AnthropicApiKeySecret:
+    Type: String
+    Default: ""
+    Description: >
+      Optional Secrets Manager secret ARN holding the model key. Left empty,
+      the function deploys without one and /ask returns a clear error until a
+      key is set by hand. The key is never a template parameter.
+
+Conditions:
+  HasSecret: !Not [!Equals [!Ref AnthropicApiKeySecret, ""]]
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Architectures: [arm64]
+    Timeout: 90
+    MemorySize: 512
+
+Resources:
+  AskApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, OPTIONS]
+        AllowHeaders: [content-type]
+
+  AskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: sightline-ask
+      CodeUri: ./
+      Handler: lambda_function.lambda_handler
+      Description: Answers a question about the frame a viewer is on.
+      Environment:
+        Variables:
+          SIGHTLINE_SITE: !Ref SiteUrl
+          SIGHTLINE_MODEL: !Ref ModelId
+          SIGHTLINE_VOICE: !Ref PollyVoice
+          SIGHTLINE_KEY_SECRET_ARN: !If [HasSecret, !Ref AnthropicApiKeySecret, !Ref "AWS::NoValue"]
+      Policies:
+        # Polly speaks the answer. Nothing else is needed, and nothing else is
+        # granted: no S3, no Bedrock, no logs beyond the managed policy.
+        - Statement:
+            - Effect: Allow
+              Action: [polly:SynthesizeSpeech]
+              Resource: "*"
+        - !If
+          - HasSecret
+          - Statement:
+              - Effect: Allow
+                Action: [secretsmanager:GetSecretValue]
+                Resource: !Ref AnthropicApiKeySecret
+          - !Ref "AWS::NoValue"
+      Events:
+        Ask:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AskApi
+            Path: /ask
+            Method: POST
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref AskApi
+            Path: /health
+            Method: GET
+
+Outputs:
+  AskEndpoint:
+    Description: POST a question here. GET /health to check it is alive.
+    Value: !Sub "https://${AskApi}.execute-api.${AWS::Region}.amazonaws.com"
+  HealthCheck:
+    Description: Paste this into a browser to verify the deployment.
+    Value: !Sub "https://${AskApi}.execute-api.${AWS::Region}.amazonaws.com/health"
