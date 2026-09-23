@@ -16,7 +16,10 @@ without it and refuses to answer until the account owner sets it themselves,
 so the key never passes through this script, a shell history or a log. See
 the instructions it prints.
 
-    python infra/deploy_ask.py
+    pipeline/.venv/bin/python infra/deploy_ask.py
+
+Run it with the pipeline venv's interpreter, not the system python, which
+does not have boto3. On Windows that is pipeline\\.venv\\Scripts\\python.
 """
 import io
 import json
