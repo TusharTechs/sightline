@@ -34,3 +34,16 @@ submission/
 # The narration text is the exception: it is a source, not an output.
 build/
 !build/demo/narration.json
+
+# Certificates and keys. Nothing TLS related belongs in this repository. The
+# bundle tools/make-ca-bundle.sh produces is written under $HOME by default,
+# and these rules are the backstop if someone points it at the working tree.
+*.pem
+*.crt
+*.cer
+*.der
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
