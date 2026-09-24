@@ -78,8 +78,12 @@
      element here. It is the product, minus the television. -->
 <video id="film" playsinline controls preload="metadata" aria-label="Film with generated audio description"></video>
 
-<button id="start" class="primary">Play with description</button>
-<button id="follow">Follow a Fire TV instead</button>
+<button id="start" class="primary" aria-keyshortcuts="Escape">Play with description</button>
+<button id="follow" aria-keyshortcuts="Escape">Follow a Fire TV instead</button>
+<!-- Discoverability is half the fix. A reviewer who could not find a way to
+     stop was not helped by the fact that one existed. This line appears once
+     playback starts and is not written to by tick(), unlike #detail. -->
+<p class="sub" id="stopHint" hidden>Press Escape at any time to stop.</p>
 
 <!-- Deliberately NOT a live region. It holds a position that changes every
      second, and a live region would have a screen reader read the clock out
@@ -166,6 +170,7 @@
   const film = el('film'), followBtn = el('follow');
   // 'standalone' plays the film here; 'follow' tracks a Fire TV.
   let mode = 'standalone';
+  let started = false;   // begin() has run; the buttons are toggles from here
   let ctx = null;            // unlocked by the Start gesture; mobile requires it
   let timeline = null;
   const srcs = new Map();     // rank -> url of the spoken line
@@ -421,11 +426,12 @@
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') await ctx.resume();
     running = true;
-    startBtn.setAttribute('aria-pressed', 'true');
+    started = true;
+    el('stopHint').hidden = false;
     startBtn.classList.remove('primary');
     await connect();
     if (mode === 'standalone') {
-      startBtn.textContent = 'Playing with description';
+      startBtn.textContent = 'Pause';
       followBtn.hidden = true;
       film.hidden = false;
       // Route before the first play, while we are still inside the gesture
@@ -442,7 +448,7 @@
     } else {
       startBtn.hidden = true;
       askSection.hidden = false;
-      followBtn.textContent = 'Following the television';
+      followBtn.textContent = 'Stop following';
       film.hidden = true;
       say('Listening for the television.');
     }
@@ -452,6 +458,44 @@
 
   function startTicking() {
     if (tickTimer === null) tickTimer = setInterval(tick, 250);
+  }
+
+  // Until this existed there was no way to stop. `running` was set true once
+  // and never set false, the 250ms tick ran for the life of the tab, and a
+  // description already being spoken had no control attached to it at all.
+  // A blind reviewer reported the only way out was closing the tab, which is
+  // the correct description of what the page did.
+  //
+  // Pausing the film is not enough on its own: description plays through its
+  // own audio elements, so a line in progress keeps speaking over a paused
+  // film unless it is stopped too.
+  function haltPlayback() {
+    running = false;
+    if (tickTimer !== null) { clearInterval(tickTimer); tickTimer = null; }
+    for (const a of voices) { try { a.pause(); a.currentTime = 0; } catch (e) {} }
+    clearTimeout(duckTimer);
+    setFilmGain(1, 0.08);
+    if (mode === 'standalone') { try { film.pause(); } catch (e) {} }
+  }
+
+  function resumePlayback() {
+    running = true;
+    startTicking();
+    if (mode === 'standalone') { const p = film.play(); if (p && p.catch) p.catch(() => {}); }
+  }
+
+  function togglePlayback() {
+    if (running) {
+      haltPlayback();
+      startBtn.textContent = mode === 'standalone' ? 'Resume' : 'Resume following';
+      followBtn.textContent = 'Resume following';
+      say('Paused.');
+    } else {
+      resumePlayback();
+      startBtn.textContent = mode === 'standalone' ? 'Pause' : 'Stop following';
+      followBtn.textContent = 'Stop following';
+      say(mode === 'standalone' ? 'Playing.' : 'Following again.');
+    }
   }
   function stopTicking() {
     if (tickTimer !== null) { clearInterval(tickTimer); tickTimer = null; }
@@ -468,8 +512,21 @@
     startTicking();
   });
 
-  startBtn.addEventListener('click', () => begin('standalone'));
-  followBtn.addEventListener('click', () => begin('follow'));
+  startBtn.addEventListener('click', () => {
+    if (!started) begin('standalone'); else togglePlayback();
+  });
+  followBtn.addEventListener('click', () => {
+    if (!started) begin('follow'); else togglePlayback();
+  });
+
+  // Escape stops everything, from anywhere on the page. A listener who wants
+  // it to stop should not have to find a control first.
+  addEventListener('keydown', (e) => {
+    const t = e.target;
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    if (typing || !started) return;
+    if (e.key === 'Escape' && running) { e.preventDefault(); togglePlayback(); }
+  });
   film.hidden = true;
 
   // Interactive description. The Fire TV has no app-level speech recognition,
