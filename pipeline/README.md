@@ -28,6 +28,7 @@ Description Project list, and all architectural rather than cosmetic:
 | 1c. Audio onset shape analysis | `src/audio_events.py` | no | **works — separates percussive impacts from score swells (invariance verified in `src/stability.py`)** |
 | 2+3. Salience + description | `src/salience.py` | **yes** | **works — precision 1.00, recall 1.00 on the fixture** |
 | 3b. Film cue generation + ranking | `src/film_cues.py` | **yes** | **works — concurrent pass, continuity repair, global rank** |
+| 3c. Silent sign & gesture strip | `src/signs.py` | **yes** | **works — multi-frame strip for hand signs, ASL/BSL & on-screen signs -> Polly audio + transcript** |
 | 4. Speech + word budget | `src/speech.py` | no | **works — Amazon Polly (generative), calibrated at 203 wpm** |
 | 5. Evaluation + preflight QA | `src/evaluate.py`, `src/preflight.py` | no | **works — catches camera language, dialogue collisions, coverage holes** |
 | 6. Device bundle + render | `src/export_device_bundle.py`, `src/render_from_bundle.py` | no | **works — fragmented MP4 + 48kHz PCM + ranked timeline** |

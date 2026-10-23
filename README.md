@@ -12,7 +12,7 @@
 Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 
 [![tests](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml/badge.svg)](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml)
-[![97 tests](https://img.shields.io/badge/tests-97%20passing-success)](#what-is-tested-and-why)
+[![110 tests](https://img.shields.io/badge/tests-110%20passing-success)](#what-is-tested-and-why)
 [![Linux · macOS · Windows](https://img.shields.io/badge/runs%20on-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-informational)](#run-it)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
@@ -207,9 +207,12 @@ often than a person.
 **Asking questions works directly on the hosted pages** — type a question (or
 use your phone keyboard's dictation key) or tap one of the presets. The page
 sends the current playhead to a live AWS Lambda endpoint
-([`infra/lambda_function.py`](infra/lambda_function.py)), which reads the
-pre-extracted frame and the spoiler-free transcript and description history up
-to that second, asks Claude Opus 5, and speaks the answer via Amazon Polly.
+([`infra/lambda_function.py`](infra/lambda_function.py)), which reads a
+chronological strip of frames leading up to that second (so hand signs, silent
+gestures, sign language, and transient on-screen signs are caught even if the
+viewer pauses a beat later) along with the spoiler-free transcript and
+description history up to that second, asks Claude Opus 5, and speaks the
+answer via Amazon Polly.
 
 ### Running the companion service locally
 
@@ -575,11 +578,11 @@ operating system. Press **Play with description**.
 
 ## What is tested, and why
 
-97 tests. Each one locks a behaviour this project argues for, or a fault a
+110 tests. Each one locks a behaviour this project argues for, or a fault a
 blind reviewer found. None of them need AWS, a Fire TV or a network.
 
 ```bash
-python -m pytest pipeline/tests -q        # 82
+python -m pytest pipeline/tests -q        # 95
 cd app && npm test                        # 15
 ```
 
@@ -591,7 +594,8 @@ cd app && npm test                        # 15
 | **Preflight still catches the real faults** | Camera language, dialogue collisions, missing audio, a truncated film. And the inverse: an instructional film that narrates for nine minutes is not blamed for silence it never had room to fill |
 | **Attenuating the file does not move a classification** | The test a blind reviewer proposed. Every quantity is a difference between two levels, so a uniform gain must cancel. It did not, which is how the 16-bit clipping was found. Now asserted to 0.01 dB |
 | **Speed changes the depth, never the order** | *"What I can't live with is a different story at a different speed."* What survives at 2x must be a rank-ordered prefix of what survives at 1x. Asserted at 1.25x, 1.5x, 2x and 3x |
-| **Questions never leak spoilers, and work at the end of a clip** | The hosted answerer excludes dialogue and descriptions after `t`, omits an empty image block on `?probe=1`, and steps back to the final extracted frame when a clip stops at a fractional second |
+| **Questions never leak spoilers, and work at the end of a clip** | The hosted answerer excludes dialogue, signs and descriptions after `t`, fetches a multi-frame strip leading up to `t` to catch gestures, omits an empty image block on `?probe=1`, and steps back to the final extracted frame when a clip stops at a fractional second |
+| **Silent communication is captured across frame strips and merged into the transcript** | Amazon Transcribe hears nothing when someone makes a hand sign, signs in ASL/BSL, or holds up a written note, and a two-frame diff misses gestures that happen mid-gap. `signs.py` samples a chronological strip, translates signs into spoken audio and tagged transcript entries (`[Sign]`, `[Gesture]`, `[On-screen sign]`), and preserves word-timing items |
 
 CI runs the pipeline suite on **Linux, macOS and Windows** across two Python
 versions, because this README claims all three and a claim in a README is not

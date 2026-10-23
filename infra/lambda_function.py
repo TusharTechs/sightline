@@ -24,23 +24,31 @@ MODEL = os.environ.get("SIGHTLINE_MODEL", "claude-opus-5")
 VOICE = os.environ.get("SIGHTLINE_VOICE", "Ruth")
 MAX_WORDS = 45
 MAX_QUESTION = 300
+STRIP_WINDOW = 3
 # Only these may be asked about. A public endpoint that will fetch and reason
 # about any URL handed to it is a different and much worse thing than this.
 VIDEOS = {"": "", "film": "film/", "duck": "duck/"}
 
 PROMPT = """A blind viewer is watching a film and has stopped to ask you a
-question. The frame they are on is attached, and below it is everything the
-film has given them so far: every line of dialogue spoken, and every
-description they have heard.
+question. The frame they are on (along with the frames leading up to it, when
+available) is attached, and below it is everything the film has given them so
+far: every line of dialogue spoken, any silent signs or gestures recorded in the
+transcript, and every description they have heard.
 
 Their question: "{question}"
 
 Answer it. Nothing else.
 
-- Use ALL of it. The answer may be in the frame, or in something said minutes
-  ago, or in a description they half remember. A question like "what's the
-  dagger about" is not answerable from a picture and is answerable from the
-  dialogue. Look everywhere before giving up.
+- Use ALL of it. The answer may be in the current frame, in a gesture or hand
+  sign made a second or two before they paused, in something said minutes ago,
+  or in a description they half remember. A question like "what's the dagger
+  about" is not answerable from a picture and is answerable from the dialogue.
+  Look everywhere before giving up.
+- Watch across the frames in order for silent communication: hand signs,
+  gestures (counting on fingers, shushing, pointing, nodding or shaking the
+  head, beckoning), sign language (ASL/BSL -- translate into the spoken meaning
+  rather than describing mechanical hand positions), and written signs, notes,
+  or text on screen.
 - Answer ONLY what was asked. They asked because the description did not cover
   it; a second description is not an answer.
 - NEVER go past the moment they are at. You can see what they cannot. Anything
@@ -86,6 +94,29 @@ def dialogue_up_to(transcript, t):
     return lines
 
 
+def signs_up_to(timeline, transcript, t):
+    """Silent signs and gestures recorded at or before this moment."""
+    out, seen = [], set()
+    for c in sorted(timeline.get("cues", []), key=lambda c: c["t"]):
+        if c["t"] > t:
+            break
+        s = c.get("sign") or {}
+        entry = (s.get("transcript_entry") or "").strip()
+        if entry and (round(c["t"], 1), entry) not in seen:
+            seen.add((round(c["t"], 1), entry))
+            out.append((c["t"], entry))
+    for s in transcript.get("results", {}).get("signs", []):
+        st = float(s.get("t", 0.0))
+        if st > t:
+            continue
+        entry = (s.get("transcript_entry") or "").strip()
+        if entry and (round(st, 1), entry) not in seen:
+            seen.add((round(st, 1), entry))
+            out.append((st, entry))
+    out.sort(key=lambda x: x[0])
+    return out
+
+
 def build_context(timeline, transcript, t):
     said = [c for c in sorted(timeline["cues"], key=lambda c: c["t"]) if c["t"] <= t]
     parts = []
@@ -96,6 +127,10 @@ def build_context(timeline, transcript, t):
     parts.append("Dialogue spoken so far, in order:\n"
                  + "\n".join(f"  [{ts:.0f}s] {tx}" for ts, tx in spoken)
                  if spoken else "No dialogue has been spoken yet.")
+    signed = signs_up_to(timeline, transcript, t)
+    if signed:
+        parts.append("Signs and gestures recorded so far, in order:\n"
+                     + "\n".join(f"  [{ts:.0f}s] {tx}" for ts, tx in signed))
     parts.append(f"They are {t:.0f} seconds in. Nothing after this has "
                  f"happened for them yet.")
     return "\n\n".join(parts)
@@ -138,19 +173,69 @@ class ModelRefused(Exception):
     """
 
 
+def fetch_frame_strip(base, t, window=STRIP_WINDOW):
+    """Fetch the frame at `t` plus up to `window` preceding seconds.
+
+    A viewer who pauses to ask "what hand sign did they just make?" or "what
+    did she just gesture?" presses the button a second or two after the gesture
+    peaked. Looking only at the frame at `t` sees hands already back at rest.
+    Fetching the short run of preceding 1-fps frames gives the model the motion
+    leading up to the pause while never stepping past `t`.
+    """
+    idx = max(1, int(t) + 1)
+    try:
+        current = _get(f"{base}frames/{idx:05d}.jpg", binary=True)
+        resolved = idx
+    except urllib.error.HTTPError:
+        # At the end of a clip (e.g. 52.2s on a 52-frame extract), int(t)+1
+        # is one past the last frame. Step back to the final extracted second.
+        resolved = max(1, idx - 1)
+        current = _get(f"{base}frames/{resolved:05d}.jpg", binary=True)
+
+    earlier = []
+    start_idx = max(1, resolved - max(0, int(window)))
+    for k in range(start_idx, resolved):
+        try:
+            jpg = _get(f"{base}frames/{k:05d}.jpg", binary=True)
+            if jpg:
+                earlier.append(jpg)
+        except Exception:
+            pass
+    earlier.append(current)
+    return earlier
+
+
 def ask_model(frame_jpg, question, context):
+    if isinstance(frame_jpg, (list, tuple)):
+        frames = [f for f in frame_jpg if f]
+    elif frame_jpg:
+        frames = [frame_jpg]
+    else:
+        frames = []
+
     content = []
-    if frame_jpg:
+    if len(frames) == 1:
         content.append({"type": "image", "source": {
             "type": "base64",
             "media_type": "image/jpeg",
-            "data": base64.b64encode(frame_jpg).decode()}})
+            "data": base64.b64encode(frames[0]).decode()}})
+    elif len(frames) > 1:
+        n = len(frames)
+        for i, jpg in enumerate(frames):
+            ago = n - 1 - i
+            label = ("Current frame (moment asked about):" if ago == 0
+                     else f"Earlier frame ({ago}s before):")
+            content.append({"type": "text", "text": label})
+            content.append({"type": "image", "source": {
+                "type": "base64",
+                "media_type": "image/jpeg",
+                "data": base64.b64encode(jpg).decode()}})
     content.append({"type": "text", "text": (
         PROMPT.format(question=question, max_words=MAX_WORDS, context=context)
-        if frame_jpg else question)})
+        if frames else question)})
     body = {
         "model": MODEL,
-        "max_tokens": 1024 if frame_jpg else 16,
+        "max_tokens": 1024 if frames else 16,
         "messages": [{"role": "user", "content": content}],
     }
     req = urllib.request.Request(
@@ -266,23 +351,21 @@ def lambda_handler(event, context):
         return _reply(400, {"error": "bad timestamp"})
 
     base = f"{SITE}/{VIDEOS[video]}"
-    idx = max(1, int(t) + 1)
     try:
         timeline = _get(base + "timeline.json")
         transcript = _get(base + "transcript.json")
-        try:
-            frame = _get(f"{base}frames/{idx:05d}.jpg", binary=True)
-        except urllib.error.HTTPError:
-            # At the end of a clip (e.g. 52.2s on a 52-frame extract), int(t)+1
-            # is one past the last frame. Step back to the final extracted second.
-            frame = _get(f"{base}frames/{max(1, idx - 1):05d}.jpg", binary=True)
+        frames = fetch_frame_strip(base, t)
     except urllib.error.HTTPError:
         # Past the last extracted second, or the clip has no frame there.
         return _reply(404, {"error": "no frame for that moment"})
 
     degraded = None
     try:
-        answer = ask_model(frame, question, build_context(timeline, transcript, t))
+        answer = ask_model(
+            frames if len(frames) > 1 else frames[0],
+            question,
+            build_context(timeline, transcript, t),
+        )
     except ModelRefused as e:
         # Answer with what is known rather than with an error. Labelled, so
         # nobody mistakes a recap for the answer they asked for.

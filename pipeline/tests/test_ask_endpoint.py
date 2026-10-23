@@ -128,3 +128,62 @@ class TestRecapFallback:
         assert "Described so far:" in r
         assert "Said so far:" in r
         assert "dragon rises" not in r
+
+
+class TestSignStripAndContext:
+    def test_fetch_frame_strip_collects_preceding_frames_in_order(self, monkeypatch):
+        fetched = []
+
+        def fake_get(url, binary=False):
+            fetched.append(url.split("/")[-1])
+            return url.split("/")[-1].encode()
+
+        monkeypatch.setattr(ask_fn, "_get", fake_get)
+        strip = ask_fn.fetch_frame_strip("https://example.test/", t=10.0, window=3)
+        # At t=10.0, idx is 11, so the 4-frame strip is 00008..00011 in chronological order
+        assert strip == [b"00008.jpg", b"00009.jpg", b"00010.jpg", b"00011.jpg"]
+
+    def test_multi_frame_question_labels_earlier_and_current_frames(self, monkeypatch):
+        captured = {}
+
+        class FakeResp:
+            def __enter__(self):
+                return self
+            def __exit__(self, *a):
+                pass
+            def read(self):
+                return json.dumps({"content": [{"text": "He holds up two fingers."}]}).encode()
+
+        def fake_urlopen(req, timeout=60):
+            captured["body"] = json.loads(req.data.decode())
+            return FakeResp()
+
+        monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+        monkeypatch.setattr(ask_fn.urllib.request, "urlopen", fake_urlopen)
+
+        out = ask_fn.ask_model(
+            [b"\xff\xd8\x01", b"\xff\xd8\x02", b"\xff\xd8\x03"],
+            "What sign did he just make?",
+            "ctx",
+        )
+        assert out == "He holds up two fingers."
+        content = captured["body"]["messages"][0]["content"]
+        images = [b for b in content if b["type"] == "image"]
+        texts = [b["text"] for b in content if b["type"] == "text"]
+        assert len(images) == 3
+        assert any("2s before" in tx for tx in texts)
+        assert any("Current frame" in tx for tx in texts)
+
+    def test_signs_up_to_excludes_future_signs(self):
+        tl = {
+            "media": "content.mp4",
+            "cues": [
+                {"t": 6.0, "rank": 1, "text": "He puts a finger to his lips.",
+                 "sign": {"transcript_entry": "[Gesture: finger to lips]"}},
+                {"t": 40.0, "rank": 2, "text": "She signs wait.",
+                 "sign": {"transcript_entry": '[Sign: "Wait"]'}},
+            ],
+        }
+        ctx = ask_fn.build_context(tl, TRANSCRIPT, t=15.0)
+        assert "[Gesture: finger to lips]" in ctx
+        assert '[Sign: "Wait"]' not in ctx

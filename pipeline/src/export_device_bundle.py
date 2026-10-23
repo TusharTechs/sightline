@@ -138,7 +138,8 @@ def main():
     if "cues" in raw:
         film = True
         salient = [{"t_to": c["t"], "changed": c["changed"],
-                    "description": c["description"]} for c in raw["cues"]]
+                    "description": c["description"],
+                    "sign": c.get("sign")} for c in raw["cues"]]
     else:
         film = False
         salient = [r for r in raw["results"] if r.get("salient")]
@@ -177,7 +178,7 @@ def main():
             text = describe_at_budget(src["changed"], words, a.backend)
         pcm_name = f"desc-{r['rank']:02d}.pcm"
         meta = synthesize(text, os.path.join(a.out, pcm_name))
-        cues.append({
+        entry = {
             "t": round(src["t_to"], 3),
             "rank": r["rank"],
             "pcm": pcm_name,
@@ -185,7 +186,10 @@ def main():
             "duration": meta["duration_s"],
             "caused_by_viewer": r["caused_by_viewer"],
             "why_ranked": r["why"],
-        })
+        }
+        if src.get("sign"):
+            entry["sign"] = src["sign"]
+        cues.append(entry)
         print(f"  #{r['rank']} t={src['t_to']:<6} {'[caused]' if r['caused_by_viewer'] else '        '} "
               f"{meta['words']}w/{meta['duration_s']}s  {text}", file=sys.stderr)
 

@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from salience import describe_film_change, onset_has_visible_cause, make_continuous
 from speech import budget_words, synthesize
 from audio_events import analyse, describe_for_prompt, worth_checking
+from signs import (extract_strip, detect_signs, describe_signs_for_prompt,
+                   merge_signs_into_transcript)
 
 FRAME_WIDTH = 1280     # 800px was slower AND lost detail; measured, not assumed
 # A long gap gets described more than once. Sixteen seconds of silence in a film
@@ -105,6 +107,13 @@ def main():
                         "it is doing something. Off by default: one reviewer "
                         "finds camera vocabulary useless, another wants it, "
                         "and they are each right about themselves")
+    p.add_argument("--signs", action="store_true",
+                   help="sample a multi-frame strip across each stretch to "
+                        "catch hand signs, silent gestures, sign language, "
+                        "and on-screen written signs that a two-frame diff misses")
+    p.add_argument("--transcript-out",
+                   help="optional path to write transcript JSON enriched with "
+                        "recognized silent signs")
     p.add_argument("--out", required=True)
     a = p.parse_args()
 
@@ -167,12 +176,37 @@ def main():
             except Exception:
                 pass
         note = describe_for_prompt(audio, spoken, checked)
-
         ask = max(a.min_words, int(budget * FIRST_ASK))
+
+        sign_verdict = None
+        if a.signs:
+            try:
+                strip = extract_strip(a.media, anchor, g["end"], td, tag=f"sign_{i}")
+                if not all(_near_black(f["path"]) for f in strip):
+                    sign_verdict = detect_signs(
+                        strip, max_words=ask, dialogue=spoken,
+                        backend=a.backend, effort=a.effort,
+                    )
+                    sign_note = describe_signs_for_prompt(sign_verdict)
+                    if sign_note:
+                        note = f"{note}\n{sign_note}"
+            except Exception:
+                sign_verdict = None
+
         v = describe_film_change(before, after, ask, spoken, a.backend, note,
                                  a.effort, a.cinematic)
+        # If the two endpoint frames looked static, `describe_film_change` may
+        # skip even when a gesture or sign occurred across the strip inside the
+        # stretch. Promote the sign's spoken translation rather than dropping it.
         if not (v["worth_saying"] and v["description"].strip()):
-            return None, f"[skip] gap {g['start']:>6}-{g['end']:<6} {v['changed'][:52]}"
+            if sign_verdict and sign_verdict.get("found") and sign_verdict.get("spoken_description"):
+                v = {
+                    "changed": sign_verdict["transcript_entry"] or sign_verdict["raw_meaning"],
+                    "worth_saying": True,
+                    "description": sign_verdict["spoken_description"],
+                }
+            else:
+                return None, f"[skip] gap {g['start']:>6}-{g['end']:<6} {v['changed'][:52]}"
 
         # Budget is an estimate; the rendered duration decides.
         avail = g["len_s"] / a.rate
@@ -191,7 +225,7 @@ def main():
         if meta and meta["duration_s"] > avail:
             return None, f"[drop] gap {g['start']} will not fit {avail:.2f}s"
 
-        return {
+        cue_out = {
             "t": g["start"], "gap": g, "word_budget": budget,
             "changed": v["changed"], "description": text,
             "speech_s": meta["duration_s"] if meta else None,
@@ -199,7 +233,10 @@ def main():
                       "checked": checked,
                       "unexplained": [c["t"] for c in checked
                                       if not c["visible_cause"]]},
-        }, f"[say ] gap {g['start']:>6}-{g['end']:<6} {text[:52]}"
+        }
+        if sign_verdict and sign_verdict.get("found"):
+            cue_out["sign"] = sign_verdict
+        return cue_out, f"[say ] gap {g['start']:>6}-{g['end']:<6} {text[:52]}"
 
     # Pass 1, concurrent. Each segment is described against the START OF THE
     # PREVIOUS SEGMENT rather than the previous thing actually said, which makes
@@ -268,6 +305,13 @@ def main():
         cues = [c for i, c in enumerate(cues) if i in keep]
         print(f"  kept the {len(cues)} most needed cues across the whole film, "
               f"dropped {dropped}", file=sys.stderr)
+
+    if a.transcript_out:
+        base_tr = (json.load(open(a.transcript))
+                   if a.transcript and os.path.exists(a.transcript)
+                   else {"results": {"items": []}})
+        enriched = merge_signs_into_transcript(base_tr, cues)
+        json.dump(enriched, open(a.transcript_out, "w"), indent=2)
 
     json.dump({"media": a.media, "rate": a.rate, "count": len(cues), "cues": cues},
               open(a.out, "w"), indent=2)

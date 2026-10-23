@@ -425,7 +425,12 @@ need it said back to them. Spend the words on what makes no sound:
 - who else is present and has not spoken
 - what someone is carrying, wearing, or holding
 - where someone went while the music was up
-- a look or gesture that changes what the next line means
+- a look, hand sign, or gesture that changes what the next line means (such as
+  holding up fingers, shushing, pointing, beckoning, nodding, or shaking the head)
+- sign language (ASL/BSL) words or short signed phrases — translate what is
+  signed into its spoken meaning rather than describing mechanical hand shapes
+- a written sign, held-up note, placard, or text on a screen that carries story
+  information the dialogue does not repeat
 - something visible that contradicts what is being said
 
 NEVER NAME WHAT YOU CANNOT SEE.
@@ -563,7 +568,10 @@ Most needed, in this order:
 1. A sound with nothing visible to account for it. The viewer heard something
    and cannot work out what — it will nag at them through the next minute of
    the film. Only description can resolve it.
-2. A change that made no sound at all. Invisible to them by every other route.
+2. A change that made no sound at all — especially silent communication (sign
+   language, a deliberate hand sign or gesture, or a held-up written note or
+   sign in the scene). Invisible to them by every other route, and the
+   transcript carries none of it.
 3. A change that made a sound with a visible cause. They have already worked
    that out; it is the first thing to cut.
 

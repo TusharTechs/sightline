@@ -183,18 +183,25 @@ def wav_header(nbytes, rate=48000, channels=2, bits=16):
 
 
 ANSWER_PROMPT = """A blind viewer is watching a film and has stopped to ask you
-a question. The frame they are on is attached, and below it is everything the
-film has given them so far: every line of dialogue that has been spoken, and
-every description they have heard.
+a question. The frame they are on (along with the frames leading up to it, when
+available) is attached, and below it is everything the film has given them so
+far: every line of dialogue that has been spoken, any silent signs or gestures
+recorded in the transcript, and every description they have heard.
 
 Their question: "{question}"
 
 Answer it. Nothing else.
 
-- Use ALL of it. The answer may be in the frame, or in something said twenty
+- Use ALL of it. The answer may be in the current frame, in a gesture or hand
+  sign made a second or two before they paused, in something said twenty
   minutes ago, or in a description they heard earlier and have half forgotten.
   A question like "what's the dagger about" is not answerable from a picture
   and is answerable from the dialogue. Look everywhere before giving up.
+- Watch across the frames in order for silent communication: hand signs,
+  gestures (counting on fingers, shushing, pointing, nodding or shaking the
+  head, beckoning), sign language (ASL/BSL — translate into the spoken meaning
+  rather than describing mechanical hand positions), and written signs, notes,
+  or text on screen.
 - Answer ONLY what was asked. Do not narrate the scene or set it up. They
   asked because the description did not cover it; a second description is not
   an answer.
@@ -307,27 +314,46 @@ def answer_question(question, t, max_words=45):
     else:
         parts.append("No dialogue has been spoken yet.")
 
+    signed = [
+        (c["t"], c["sign"]["transcript_entry"])
+        for c in said
+        if isinstance(c.get("sign"), dict) and c["sign"].get("transcript_entry")
+    ]
+    if signed:
+        parts.append("Signs and gestures recorded so far, in order:\n"
+                     + "\n".join(f"  [{ts:.0f}s] {txt}" for ts, txt in signed))
+
     parts.append(f"They are {t:.0f} seconds in. Nothing after this has "
                  f"happened for them yet.")
     context = "\n\n".join(parts)
 
     with tempfile.TemporaryDirectory() as td:
-        png = os.path.join(td, "f.png")
-        _frame_at(media, t, png)
+        offsets = sorted({max(0.0, round(t - d, 3)) for d in (3.0, 2.0, 1.0, 0.0)})
+        content = []
+        for idx, ts in enumerate(offsets):
+            png = os.path.join(td, f"f_{idx}.png")
+            try:
+                _frame_at(media, ts, png)
+            except Exception:
+                if ts != round(t, 3):
+                    continue
+                raise
+            ago = round(t - ts, 1)
+            label = ("Current frame (moment asked about):" if ago <= 0.05
+                     else f"Earlier frame ({ago:g}s before):")
+            content.append({"type": "text", "text": label})
+            content.append({"type": "image", "source": {
+                "type": "base64", "media_type": "image/png",
+                "data": base64.standard_b64encode(open(png, "rb").read()).decode(),
+            }})
+        content.append({"type": "text", "text": ANSWER_PROMPT.format(
+            question=question, max_words=max_words, context=context)})
 
         from pydantic import BaseModel, Field
 
         class Answer(BaseModel):
             answer: str = Field(description=f"at most {max_words} words")
             can_see: bool = Field(description="was the answer visible in the frame")
-
-        content = [
-            {"type": "image", "source": {"type": "base64", "media_type": "image/png",
-                                         "data": base64.standard_b64encode(
-                                             open(png, "rb").read()).decode()}},
-            {"type": "text", "text": ANSWER_PROMPT.format(
-                question=question, max_words=max_words, context=context)},
-        ]
         import anthropic
         client = anthropic.Anthropic()
         parsed = client.messages.parse(

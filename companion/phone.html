@@ -150,6 +150,7 @@
   <button class="quick" data-q="What's happening right now?">What's happening right now?</button>
   <button class="quick" data-q="Who else is in this scene?">Who else is in this scene?</button>
   <button class="quick" data-q="What is she carrying?">What is she carrying?</button>
+  <button class="quick" data-q="Did anyone just make a hand sign or gesture, or is there a sign on screen?">Any sign or gesture just now?</button>
   <div class="status" id="answerBox" role="status" aria-live="polite" hidden>
     <b id="answerText"></b>
     <span class="dim" id="answerMeta"></span>
@@ -310,7 +311,8 @@
     const li = document.createElement('li');
     const stamp = document.createElement('span');
     stamp.className = 't';
-    stamp.textContent = `${cue.t.toFixed(1)}s`;
+    const signEntry = cue.sign && cue.sign.transcript_entry ? ` · ${cue.sign.transcript_entry}` : '';
+    stamp.textContent = `${cue.t.toFixed(1)}s${signEntry}`;
     li.append(stamp, document.createElement('br'),
               document.createTextNode(cue.text));
     log.append(li);
