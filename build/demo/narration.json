@@ -1,0 +1,19 @@
+[
+ ["01_gap", "So that was seven seconds of a film. If you can't see the screen, that's all there is. You know something happened, but not what."],
+ ["02_exists", "There's already a fix and it's not new. Audio description. Someone writes down what's on screen, a voice reads it out. Catch is, someone has to write it, and someone has to pay them. So most of what you'd put on tonight just doesn't have any."],
+ ["03_built", "So I built Sightline. It writes the description nobody was going to write, wherever the film leaves room."],
+ ["04_generating", "Nobody has ever described this clip. So it's doing it now. It works out where nobody's talking, figures out what changed, and writes only the bits you'd be lost without."],
+ ["05_same", "Same seven seconds."],
+ ["06_tworoom", "If you're blind and I'm not, we want different things out of the same screen. So the room just hears the film, and the description goes to one phone."],
+ ["07_ask", "And you can ask it anything. Type the question, or speak it. The microphone works in a browser, and on a phone the keyboard's dictation key does the same job."],
+ ["08_noreco", "No pre-recorded track can do that."],
+ ["09_reviewers", "Almost none of the rules in this are mine. A blind reviewer on the ACB Audio Description Project list gave me most of them."],
+ ["10_dave", "Then Dave Matters watched a three minute clip and told me the description stopped after two. He was right. A limit I'd written to cap the number of descriptions was cutting the film short instead."],
+ ["11_watcher", "He found something else, too. A scene where my software said someone was watching a character sleep. There was nobody there. It had turned a camera angle into a person."],
+ ["12_credit", "I didn't catch either of those. He did, and he can't see the screen. They're both fixed now, and there's a check that catches them."],
+ ["13_measured", "He asked how it handles other kinds of video, so I went and measured it."],
+ ["14_table", "An animated film: twenty four descriptions. A civil defence film from 1951, three quarters narration: eleven. A one minute advert: nothing. It fills every second it paid for."],
+ ["15_limit", "So it doesn't describe everything. It describes whatever it's left room to."],
+ ["16_close", "Those seven seconds at the start were uncomfortable. For most of what gets made, that's the whole film."],
+ ["17_name", "Sightline."]
+]
