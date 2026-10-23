@@ -12,32 +12,32 @@
     "audio_segments": [],
     "signs": [
       {
-        "t": 0.0,
+        "t": 0.4,
         "kind": "sign_language",
-        "raw_meaning": "ASL video series: Parents supporting children \u2014 presented by Amy E. Peterson, Certified Deaf Interpreter",
-        "spoken_description": "An interpreter signs the series title, Parents Supporting Children; a caption names Amy Peterson, Deaf interpreter.",
-        "transcript_entry": "[Sign: \"ASL video series: Parents supporting children \u2014 presented by Amy E. Peterson, Certified Deaf Interpreter\"]"
+        "raw_meaning": "ASL video series: Parents supporting children, with Certified Deaf Interpreter Amy E. Peterson.",
+        "spoken_description": "ASL series: parents supporting children, presented by certified deaf interpreter Amy E. Peterson.",
+        "transcript_entry": "[Sign: \"ASL video series: Parents supporting children, with Certified Deaf Interpreter Amy E. Peterson.\"]"
       },
       {
         "t": 6.171,
         "kind": "sign_language",
-        "raw_meaning": "Two \u2014 the second point, pointing to it",
-        "spoken_description": "She signs the number two, marking a second point, then points to it.",
-        "transcript_entry": "[Sign: \"Two \u2014 the second point, pointing to it\"]"
+        "raw_meaning": "Second point: here is the next thing to know.",
+        "spoken_description": "Second, here is the next important point to understand.",
+        "transcript_entry": "[Sign: \"Second point: here is the next thing to know.\"]"
       },
       {
         "t": 12.341,
         "kind": "sign_language",
-        "raw_meaning": "Working together to support and communicate with each other",
-        "spoken_description": "She signs about people working together, supporting one another, and communicating as a group.",
-        "transcript_entry": "[Sign: \"Working together to support and communicate with each other\"]"
+        "raw_meaning": "Working together as a team, we each follow the same rules and support one another.",
+        "spoken_description": "Working together as a team, we follow the same rules and support one another.",
+        "transcript_entry": "[Sign: \"Working together as a team, we each follow the same rules and support one another.\"]"
       },
       {
         "t": 18.512,
         "kind": "sign_language",
-        "raw_meaning": "Rules and standards must be followed, with careful attention and explanation",
-        "spoken_description": "A woman signs about following rules and standards, explaining each point with careful, deliberate hands.",
-        "transcript_entry": "[Sign: \"Rules and standards must be followed, with careful attention and explanation\"]"
+        "raw_meaning": "Stress builds up, so think about what you need and take a break.",
+        "spoken_description": "Stress builds up, so think about what you need and give yourself a break.",
+        "transcript_entry": "[Sign: \"Stress builds up, so think about what you need and take a break.\"]"
       }
     ]
   }
