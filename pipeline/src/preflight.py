@@ -153,7 +153,16 @@ def check(bundle, gaps_path=None):
             fails.append(f'{c["t"]}s uses camera language: "{m.group(0)}" in '
                          f'"{d}"')
 
-    # 6. Repeated phrases across the run.
+    # 6. Repeated phrases across the run, and repetitive "She signs" wrappers.
+    sign_wrappers = [
+        c["t"] for c in cues
+        if re.search(r"\b(she|he|the interpreter|a woman|a man)\s+signs\b",
+                     c.get("description") or c.get("text", ""), re.I)
+    ]
+    if len(sign_wrappers) > 1:
+        notes.append(f'"... signs" repeated across {len(sign_wrappers)} cues '
+                     f'({sign_wrappers}) — voice the signed meaning directly')
+
     grams = Counter()
     for c in cues:
         w = re.findall(r"[a-z']+", (c.get("description") or c.get("text","")).lower())

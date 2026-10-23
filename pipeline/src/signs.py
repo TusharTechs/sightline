@@ -49,22 +49,32 @@ Look across the frame sequence in order for any of these three things:
    handing over / refusing an object.
    Do NOT report ordinary talking-with-hands movement or walking.
 
-2. `sign_language` — sign language (such as ASL or BSL) words or short signed
-   phrases. Translate what is signed into its English meaning when you can read
-   it clearly; never describe mechanical hand positions ("moves right hand to
-   chin") when the viewer needs the meaning ("signs 'thank you'"). If a person
-   is clearly signing in sign language but the exact word cannot be read from
-   these frames with certainty, state that they are signing without guessing the
-   words.
+2. `sign_language` — sign language (such as ASL or BSL) words, fingerspelling,
+   or signed phrases. Sign language IS the speaker's voice: a blind viewer
+   wants to lean back and hear what the person is saying, not be told "She
+   signs..." before every sentence. Read the recognizable signs, fingerspelled
+   letters, and facial grammar across the frame sequence and write both
+   `raw_meaning` and `spoken_description` as the **direct spoken translation**
+   of what is being communicated (for example: `"Parents supporting children,
+   with interpreter Amy Peterson."`, `"Second: talk openly and listen to one
+   another."`, `"Work together and support each other as a family."`, `"Keep
+   clear rules and explain each step carefully."`).
+   Do NOT prefix `spoken_description` with `"She signs"`, `"He signs"`, or
+   `"A woman signs about"` — voice the signed meaning directly, as an
+   interpreter speaking for the signer. Never describe mechanical hand geometry
+   ("places closed fist on flat palm"), and never output meta-disclaimers such
+   as "Unclear" or "exact words cannot be read from these frames".
 
 3. `written_sign` — a written sign, held-up note, placard, label, street or door
-   sign, or text message on a screen that a character shows or looks at in the
-   scene, or a title card that gives a place, date, or elapsed time.
+   sign, lower-third identification, or text message on a screen that a
+   character shows or looks at in the scene, or a title card that gives the
+   topic, place, date, or speaker.
    Do NOT report studio logos, opening credits, or decorative end cards.
 
 HARD RULES:
-- Never guess a sign's meaning if you cannot see it clearly across the frames.
-  A wrong translation is worse than none.
+- Never output meta-commentary about frame sampling or legibility (never write
+  "Unclear", "cannot be read reliably", or "exact words aren't clear"). Report
+  what you can genuinely read from the signs, gestures, and on-screen text.
 - Do not repeat information already spoken aloud in the dialogue: "{dialogue}"
 - Write `spoken_description` for a listener, in at most {max_words} words,
   present tense, plain spoken English, no camera vocabulary."""
@@ -107,6 +117,8 @@ def format_transcript_entry(kind, raw_meaning, spoken_description=""):
     """Format a recognized sign or gesture as a readable transcript line."""
     meaning = (raw_meaning or "").strip()
     spoken = (spoken_description or "").strip()
+    if meaning.lower().startswith("unclear"):
+        meaning = ""
     body = meaning or spoken
     if not body or kind not in SIGN_KINDS or kind == "none":
         return ""
@@ -130,14 +142,14 @@ def describe_signs_for_prompt(verdict):
     if not detail or kind == "none":
         return ""
     label = {
-        "gesture": "Silent hand sign / gesture detected across this stretch",
-        "sign_language": "Sign-language communication detected across this stretch",
-        "written_sign": "Readable on-screen sign / text detected in this stretch",
+        "gesture": "Silent hand sign / gesture detected across the multi-frame strip of this stretch",
+        "sign_language": "Sign-language communication detected across the multi-frame strip of this stretch",
+        "written_sign": "Readable on-screen sign / text detected across the multi-frame strip of this stretch",
     }.get(kind, "Silent visual sign detected")
     return (f"{label}: {detail} "
-            f"(suggested phrasing: \"{spoken or detail}\"). "
-            f"Because the soundtrack carries none of this, include it unless "
-            f"the viewer would follow the scene without it.")
+            f"(suggested spoken line: \"{spoken or detail}\"). "
+            f"Because BEFORE and AFTER are only two endpoint frames, include "
+            f"this signed meaning or gesture in your spoken description.")
 
 
 def merge_signs_into_transcript(transcript, sign_cues):

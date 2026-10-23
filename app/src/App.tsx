@@ -50,6 +50,7 @@ export const App = () => {
 
   const [status, setStatus] = useState('starting');
   const [caption, setCaption] = useState('');
+  const [signTag, setSignTag] = useState('');
   const [dropped, setDropped] = useState(0);
   const [mode, setMode] = useState<Mode>('fit');
   const [rate, setRate] = useState(1.0);
@@ -176,6 +177,17 @@ export const App = () => {
               captionTimer.current = null;
             }
             setCaption(cue.text);
+            if (cue.sign?.found) {
+              const label =
+                cue.sign.kind === 'sign_language'
+                  ? 'SIGNED · TRANSLATED FROM SIGN LANGUAGE'
+                  : cue.sign.kind === 'written_sign'
+                    ? 'ON-SCREEN SIGN'
+                    : 'SILENT GESTURE';
+              setSignTag(label);
+            } else {
+              setSignTag('');
+            }
             return duckWhile(async () =>
               buf ? await channel.speak(buf) : false,
             );
@@ -195,7 +207,10 @@ export const App = () => {
             if (!cue) {
               if (captionTimer.current) clearTimeout(captionTimer.current);
               captionTimer.current = setTimeout(
-                () => setCaption(''),
+                () => {
+                  setCaption('');
+                  setSignTag('');
+                },
                 400,
               ) as unknown as number;
             }
@@ -215,7 +230,9 @@ export const App = () => {
       // continuously. That is end-of-stream noise, not a missing event —
       // timeupdate delivery to JS was verified.)
       player.on('timeupdate', () => {
-        scheduler.current?.tick(player.currentTime, player.rate);
+        if (!player.paused && player.currentTime > 0.05) {
+          scheduler.current?.tick(player.currentTime, player.rate);
+        }
       });
       if (poll.current) clearInterval(poll.current);
       poll.current = setInterval(() => {
@@ -223,7 +240,7 @@ export const App = () => {
         setElapsed(t);
         // In co-viewing the phone schedules for itself from the same timeline;
         // this device must stay silent, or the room hears it twice.
-        if (targetRef.current === 'tv') {
+        if (targetRef.current === 'tv' && !player.paused && t > 0.05) {
           scheduler.current?.tick(t, player.rate);
         }
       }, 120) as unknown as number;
@@ -497,7 +514,12 @@ export const App = () => {
           ]}>
           <View style={styles.captionBar}>
             <View style={styles.captionAccent} />
-            <Text style={styles.caption}>{caption}</Text>
+            <View style={styles.captionBody}>
+              {signTag ? (
+                <Text style={styles.signBadge}>{signTag}</Text>
+              ) : null}
+              <Text style={styles.caption}>{caption}</Text>
+            </View>
           </View>
         </View>
       ) : null}
@@ -571,6 +593,17 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: ACCENT,
     marginRight: 18,
+  },
+  captionBody: {
+    flexShrink: 1,
+  },
+  signBadge: {
+    color: ACCENT,
+    fontSize: 19,
+    lineHeight: 24,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    marginBottom: 4,
   },
   caption: {
     flexShrink: 1,

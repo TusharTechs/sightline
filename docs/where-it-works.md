@@ -10,6 +10,7 @@ kinds of material, so it was run over three, all public domain.
 | content | length | is dialogue | describable | cues produced |
 |---|---|---|---|---|
 | *Sintel* — animated film | 14:48 | 4.5% | 90% | 24 in a 3-minute stretch |
+| *Parents Supporting Children* — American Sign Language | 0:25 | 0.0% | 99% | 4 signed passages (`--signs`) |
 | *Duck and Cover* — instructional, 1951 | 9:15 | 77% | 9% | 11 |
 | Folgers coffee — television advert | 1:01 | 77% | 9% | **0** |
 

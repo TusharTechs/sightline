@@ -146,7 +146,12 @@ def main():
     if not salient:
         sys.exit("nothing describable in the input")
 
-    gaps = json.load(open(a.gaps))["gaps"] if a.gaps else []
+    if a.gaps:
+        gaps = json.load(open(a.gaps))["gaps"]
+    elif film:
+        gaps = [c["gap"] for c in raw["cues"] if "gap" in c]
+    else:
+        gaps = []
 
     print(f"ranking {len(salient)} changes...", file=sys.stderr)
     payload = [{"t": c["t_to"], "changed": c["changed"]} for c in salient]

@@ -133,6 +133,15 @@ class TestRepeatedIntroductions:
         _, notes = preflight.check(b, g)
         assert any("again" in n for n in notes)
 
+    def test_repeating_she_signs_wrapper_is_noted(self, tmp_path):
+        """A blind viewer watching a signed video wants to hear what is being
+        communicated, not be told 'She signs...' before every sentence."""
+        b, g = bundle(tmp_path, [
+            cue(2.0, "She signs: parents supporting children", rank=1),
+            cue(8.0, "She signs about working together", rank=2)])
+        _, notes = preflight.check(b, g)
+        assert any("signs" in n for n in notes)
+
 
 class TestEmptyBundle:
     def test_no_cues_at_all_fails(self, tmp_path):

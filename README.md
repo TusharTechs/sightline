@@ -177,7 +177,7 @@ landmarks, and live regions that announce state changes without reading the
 clock aloud. Several of those details are there because a blind reviewer
 reported the earlier versions doing the wrong thing.
 
-**Three more things worth opening, all linked from that page:**
+**Four more things worth opening, all linked from that page:**
 
 ### ▶ [/film/](https://tushartechs.github.io/sightline/film/) — three minutes of the actual film
 
@@ -186,6 +186,15 @@ A blind reviewer pointed out that made it a poor test: *"is it possible that
 the information isn't enough to draw a line through it?"* This is the film
 itself, where the story is present and the description can be judged on
 whether it conveys one.
+
+### ▶ [/signs/](https://tushartechs.github.io/sightline/signs/) — an American Sign Language video
+
+Twenty-five seconds of *Parents Supporting Children* (US public domain), signed
+in American Sign Language by Certified Deaf Interpreter Amy E. Peterson with a
+completely silent audio track (`-91.0 dB`). Amazon Transcribe hears zero words;
+Sightline's `--signs` pass samples a 6-frame chronological strip across each
+window, translates 4 signed passages into spoken English via Amazon Polly, and
+writes `[Sign: "..."]` entries into the transcript.
 
 ### ▶ [/duck/](https://tushartechs.github.io/sightline/duck/) — a 1951 civil defence film
 
@@ -406,6 +415,7 @@ most blind and partially sighted viewers prefer the cinematic style, so
 | Costs little to run | **$0.042** of AWS per minute of film, **$0.0046** per description |
 | Plays video on Fire TV | MSE reaches `canplay` → `playing`, audio audible |
 | Plays description concurrently | PCM on an accessibility stream, ducking confirmed |
+| Translates sign language & silent gestures | **4** signed passages translated into speech and `[Sign: "..."]` transcript entries on *Parents Supporting Children* (ASL, 0% spoken dialogue) |
 
 Reproduce the first two:
 

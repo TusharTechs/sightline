@@ -3,6 +3,38 @@
 Amazon Developer Hackathon 2026 · Fire TV / Vega OS track
 Started: 8 September 2026
 
+## BLUF (Bottom Line Up Front)
+
+- **Overall grade:** **B** — Vega OS 0.24 delivers a solid React Native for Vega
+  foundation, a functional Virtual Device on Apple Silicon, and working low-level
+  media primitives (`W3CMedia` URL/MSE modes and `AudioPlayer` for raw PCM). However,
+  building a synchronized accessibility application exposed **15 distinct friction
+  points** (`1 Critical`, `6 High`, `7 Medium`, `1 Low`), primarily around silent
+  runtime failures, conflicting media documentation, and Virtual Device / AudioContext
+  gaps.
+- **Persona:** Experienced full-stack & AWS developer building a first Vega OS
+  Fire TV application (`Sightline` — automated audio description and sign-language
+  voicing for blind and low-vision viewers) on macOS (`darwin-arm64`, Vega SDK `0.24.6552`).
+- **Test environment:** macOS Sequoia (`arm64`), Vega SDK `0.24.6552`, Vega Virtual
+  Device, React Native for Vega (`0.72`), `@amazon-devices/react-native-w3cmedia`,
+  `@amazon-devices/keplerscript-audio-lib`, Amazon Devices Builder Tools MCP server.
+- **Pros (what worked well):**
+  - `AudioPlayer` (`@amazon-devices/keplerscript-audio-lib`) reliably plays raw 48 kHz
+    stereo S16LE PCM buffers concurrently with `<VideoPlayer>` while allowing dynamic
+    programme volume ducking.
+  - `vega virtual-device start` + `vega device start-port-forwarding` make local
+    companion-server iteration fast once port forwarding is active.
+  - Amazon Devices Builder Tools skills (`amazon-devices-vega-media-player`,
+    `amazon-devices-vega-performance`) contain genuine platform knowledge that prevented
+    architectural dead ends.
+- **Cons (top friction themes):**
+  - Silent failures when manifest services are omitted (`FL-002`) or when `AudioContext`
+    runs in the Virtual Device (`FL-007`).
+  - Contradictions between the recommended hackathon starter repo and the platform
+    media skill (`FL-003`, `FL-006`).
+  - Undocumented URL-mode track limitations (`FL-001`) and `ReactNativeBlobUtil`
+    binary-truncation pitfalls (`FL-011`).
+
 Format per entry: task attempted · steps taken · expected vs actual · severity ·
 workaround · actionable suggestion.
 

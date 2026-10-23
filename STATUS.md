@@ -14,6 +14,7 @@ Submission day.
 | Ranked scheduling | rank fixed once; speed changes depth, never order |
 | Co-viewing | room hears the film untouched, description goes only to the phone |
 | Interactive questions | answers from the frame the television is actually on, and live on the hosted demo via AWS Lambda + API Gateway |
+| Sign language & gesture recognition | 6-frame strip analysis (`signs.py`), spoken Polly translation + `[Sign]`/`[Gesture]`/`[On-screen sign]` transcript entries; verified on device and live on `/signs/` |
 
 ## Not done — in the order I would fix them
 

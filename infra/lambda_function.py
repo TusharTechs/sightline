@@ -27,7 +27,7 @@ MAX_QUESTION = 300
 STRIP_WINDOW = 3
 # Only these may be asked about. A public endpoint that will fetch and reason
 # about any URL handed to it is a different and much worse thing than this.
-VIDEOS = {"": "", "film": "film/", "duck": "duck/"}
+VIDEOS = {"": "", "film": "film/", "duck": "duck/", "signs": "signs/"}
 
 PROMPT = """A blind viewer is watching a film and has stopped to ask you a
 question. The frame they are on (along with the frames leading up to it, when

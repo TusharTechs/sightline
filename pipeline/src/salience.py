@@ -704,10 +704,14 @@ That produces three faults, and they are the only faults you may repair:
 3. REPEATING a detail already given. A bloodied wing described twice, a tattoo
    noted three times. Say it once, the first time, and use those words on
    something else or say less.
+4. REPETITIVE SIGN-LANGUAGE WRAPPERS. If multiple lines begin with "She signs"
+   or "He signs about", strip that wrapper so the signed meaning is voiced
+   directly; a listener wants to hear what is being communicated, not be told
+   before every sentence that the speaker is still signing.
 
 You may NOT do anything else. Do not add information no line contains. Do not
 describe anything not already described. Do not improve the writing, change
-the tone, or make anything more vivid. If a line has none of the three faults,
+the tone, or make anything more vivid. If a line has none of the faults above,
 return it EXACTLY as it is, character for character.
 
 Each line has a hard word limit, given in brackets. A repaired line must be no

@@ -150,10 +150,11 @@ def main():
 
         before = os.path.join(td, f"b{i}.png")
         after = os.path.join(td, f"a{i}.png")
+        after_t = g["start"] if (g["start"] - anchor) >= 0.4 else round(g["start"] + min(2.0, g["len_s"] * 0.5), 3)
         grab(a.media, anchor, before)
-        grab(a.media, g["start"], after)
+        grab(a.media, after_t, after)
         spoken = dialogue_between(None, items, anchor, g["start"]) if items else ""
-        audio = analyse(a.media, anchor, g["start"])
+        audio = analyse(a.media, anchor, max(after_t, g["start"]))
 
         # Which of those sounds explained themselves? A noise with nothing on
         # screen to account for it is the single most useful thing to describe;
@@ -181,7 +182,12 @@ def main():
         sign_verdict = None
         if a.signs:
             try:
-                strip = extract_strip(a.media, anchor, g["end"], td, tag=f"sign_{i}")
+                # For subdivided silent passages (back-to-back gaps), inspect
+                # this segment's own window [g["start"], g["end"]] rather than
+                # re-sampling the previous segment's span.
+                strip_start = g["start"] if (i == 0 or (g["start"] - segments[i - 1]["end"]) < 0.5) else anchor
+                strip = extract_strip(a.media, strip_start, g["end"], td,
+                                      tag=f"sign_{i}", count=6)
                 if not all(_near_black(f["path"]) for f in strip):
                     sign_verdict = detect_signs(
                         strip, max_words=ask, dialogue=spoken,
@@ -193,20 +199,32 @@ def main():
             except Exception:
                 sign_verdict = None
 
-        v = describe_film_change(before, after, ask, spoken, a.backend, note,
-                                 a.effort, a.cinematic)
-        # If the two endpoint frames looked static, `describe_film_change` may
-        # skip even when a gesture or sign occurred across the strip inside the
-        # stretch. Promote the sign's spoken translation rather than dropping it.
-        if not (v["worth_saying"] and v["description"].strip()):
-            if sign_verdict and sign_verdict.get("found") and sign_verdict.get("spoken_description"):
-                v = {
-                    "changed": sign_verdict["transcript_entry"] or sign_verdict["raw_meaning"],
-                    "worth_saying": True,
-                    "description": sign_verdict["spoken_description"],
-                }
-            else:
-                return None, f"[skip] gap {g['start']:>6}-{g['end']:<6} {v['changed'][:52]}"
+        # When the 6-frame strip has already translated sign language, use that
+        # translation directly rather than letting a 2-frame endpoint comparison
+        # reduce it to mechanical hand positions.
+        if (sign_verdict and sign_verdict.get("found")
+                and sign_verdict.get("kind") == "sign_language"
+                and sign_verdict.get("spoken_description")):
+            v = {
+                "changed": sign_verdict["transcript_entry"] or sign_verdict["raw_meaning"],
+                "worth_saying": True,
+                "description": sign_verdict["spoken_description"],
+            }
+        else:
+            v = describe_film_change(before, after, ask, spoken, a.backend, note,
+                                     a.effort, a.cinematic)
+            # If the two endpoint frames looked static, `describe_film_change` may
+            # skip even when a gesture or written sign occurred across the strip
+            # inside the stretch. Promote the sign's spoken line rather than dropping it.
+            if not (v["worth_saying"] and v["description"].strip()):
+                if sign_verdict and sign_verdict.get("found") and sign_verdict.get("spoken_description"):
+                    v = {
+                        "changed": sign_verdict["transcript_entry"] or sign_verdict["raw_meaning"],
+                        "worth_saying": True,
+                        "description": sign_verdict["spoken_description"],
+                    }
+                else:
+                    return None, f"[skip] gap {g['start']:>6}-{g['end']:<6} {v['changed'][:52]}"
 
         # Budget is an estimate; the rendered duration decides.
         avail = g["len_s"] / a.rate
@@ -225,8 +243,9 @@ def main():
         if meta and meta["duration_s"] > avail:
             return None, f"[drop] gap {g['start']} will not fit {avail:.2f}s"
 
+        cue_t = round(max(0.4, g["start"]), 3) if (g["start"] < 0.4 and g["len_s"] >= 2.0) else g["start"]
         cue_out = {
-            "t": g["start"], "gap": g, "word_budget": budget,
+            "t": cue_t, "gap": g, "word_budget": budget,
             "changed": v["changed"], "description": text,
             "speech_s": meta["duration_s"] if meta else None,
             "audio": {"character": audio["character"], "onsets": audio["onsets"],

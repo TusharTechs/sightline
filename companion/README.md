@@ -18,8 +18,8 @@ SIGHTLINE_BUNDLE=/tmp/sightline-serve python3 companion/server.py
 ```
 
 Then open `http://<your-lan-ip>:8190/` on a phone on the same network and press
-**Start listening**. On the television remote, **Down** toggles between solo and
-co-viewing.
+**Follow a Fire TV instead** (or **Play with description** in standalone mode).
+On the television remote, **Down** toggles between solo and co-viewing.
 
 ## How the sync works
 
@@ -40,8 +40,10 @@ Audio is unlocked by the Start gesture because mobile browsers require one.
 
 ## Interactive description
 
-Ask about the moment you are on. By voice where the browser supports it, or from
-preset questions, which are also faster than speaking for the common cases.
+Ask about the moment you are on. By voice where the browser supports it, by
+typing any question into the text field (which also exposes the iOS keyboard's
+dictation key), or from preset questions, which are fastest for the common
+cases.
 
 This is on the phone rather than the television for a hard reason: Vega has no
 app-level speech recognition (FRICTION-LOG FL-004), so a spoken question can

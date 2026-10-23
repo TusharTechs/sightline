@@ -30,7 +30,7 @@ SF = "/System/Library/Fonts/SFNS.ttf"
 def font(sz, weight=400):
     f = ImageFont.truetype(SF, sz)
     try:
-        f.set_variation_by_axes([weight])
+        f.set_variation_by_axes([100, 28, 400, weight])
     except Exception:
         pass
     return f
@@ -78,21 +78,22 @@ def card_text(path, big, small=None, accent=None):
 def card_table(path):
     im = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(im)
-    centre(d, 170, "Measured, not claimed", font(58, 600), DIM)
+    centre(d, 150, "Measured, not claimed", font(58, 600), DIM)
     rows = [("An animated film", "4% dialogue", "24 descriptions"),
             ("A 1951 instructional film", "77% dialogue", "11 descriptions"),
+            ("An ASL sign-language video", "0% spoken", "4 signed passages"),
             ("A one-minute advert", "77% dialogue", "none")]
-    x1, x2, x3 = 300, 1080, 1450
-    y = 330
-    fh = font(44, 600); fb = font(40, 400)
+    x1, x2, x3 = 260, 1040, 1410
+    y = 290
+    fh = font(42, 600); fb = font(38, 400)
     for name, pct, n in rows:
         d.text((x1, y), name, font=fb, fill=INK)
         d.text((x2, y), pct, font=fb, fill=DIM)
         col = ACCENT if n != "none" else (240, 139, 126)
         d.text((x3, y), n, font=fh, fill=col)
-        y += 96
-        d.line([(x1, y - 26), (W - x1, y - 26)], fill=(42, 49, 58), width=2)
-    centre(d, y + 40, "It fills every second it has room for.", font(40, 400), DIM)
+        y += 88
+        d.line([(x1, y - 24), (W - x1, y - 24)], fill=(42, 49, 58), width=2)
+    centre(d, y + 36, "It fills every second it has room for.", font(40, 400), DIM)
     im.save(path)
 
 def card_end(path):
@@ -100,11 +101,10 @@ def card_end(path):
     d = ImageDraw.Draw(im)
     logo = Image.open(os.path.join(ROOT, "app/assets/image/sightline.png")).convert("RGBA")
     logo = logo.resize((140, 140))
-    im.paste(logo, ((W - 140) // 2, 300), logo)
-    y = centre(d, 470, "Sightline", font(78, 700))
-    y = centre(d, y + 30, "tushartechs.github.io/sightline", font(44, 400), ACCENT)
-    y = centre(d, y + 16, "github.com/TusharTechs/sightline", font(38, 400), DIM)
-    centre(d, y + 40, "Sintel © Blender Foundation, CC-BY 3.0", font(30, 400), (110, 122, 136))
+    im.paste(logo, ((W - 140) // 2, 310), logo)
+    y = centre(d, 480, "Sightline", font(78, 700))
+    y = centre(d, y + 26, "Audio description & sign-language voicing for Fire TV", font(38, 400), ACCENT)
+    centre(d, y + 40, "Sintel © Blender Foundation, CC-BY 3.0 · Parents Supporting Children © PaTTAN", font(28, 400), (110, 122, 136))
     im.save(path)
 
 # ---------------------------------------------------------------- the edit
@@ -125,6 +125,8 @@ S2 = T("scene-2-generation-152402.mov")
 # cue -- audio correlation could not lock on and its answer of +1.7s put the
 # wrong line on screen.
 S3 = T("scene-3-described-user.mov")
+S3B = T("scene-3b-signs-gap.mov")
+S3C = T("scene-3c-signs-described.mov")
 S4TV = T("scene-4tv-handoff-150051.mov")
 S4P = T("scene-4phone-clean.mov")
 S5 = T("scene-5-plate-150309.mov")
@@ -137,34 +139,30 @@ S5 = T("scene-5-plate-150309.mov")
 #
 # Placements avoid the device's own voice rather than ducking under it. Two
 # voices at once reads as a fault, not as layering. Measured in the takes:
-# the app speaks its offer at 2.6-7.0s and its stage line at 13.3-14.5s of the
-# generation take, and announces the handoff in the first seven seconds of the
+# the app speaks its offer at 2.0-6.4s and its stage line at 12.6-13.9s of the
+# generation take, and announces the handoff in the first three seconds of the
 # phone-handoff take. Narration goes in the gaps between those.
 EDIT = [
-    ("s01", S1,   0.0,  7.0,  [],                                 1.0),
-    ("s02", S5,   0.0,  8.0,  [("01_gap", 0.3)],                  0.22),
-    ("s03", S5,   8.2, 14.9,  [("02_exists", 0.3)],               0.22),
-    ("s04", "CARD:mark", 0, 6.5, [("03_built", 0.3)],             0.0),
-    # 04a lands in the 7.0-13.3 gap; 04b after the stage line ends at 14.5.
-    # bed at full: the app's stage line is quieter than its offer, and ducking
-    # to 0.55 put it under the floor entirely -- silent in the one scene whose
-    # point is the app narrating itself. Nothing is spoken over it now.
-    ("s05", S2,   0.0, 16.0,  [("04a_doing", 7.6), ("04b_how", 15.0)], 1.0),
-    ("s06", "CARD:later", 0, 2.0, [],                             0.0),
-    # 14.9, not 14.0: a description runs 13.24-14.61 in this take and cutting
-    # at 14.0 sliced it mid-word -- which is the break at 1:14 in the first cut.
-    ("s07", S3,   0.0, 17.1,  [("05_same", 0.5)],                 1.0),
-    # after the handoff announcement, not over it.
-    ("s08", S4TV, 0.0, 16.2,  [("06_tworoom", 8.0)],              0.85),
-    # the answer starts 6.5s in; this has to be finished before it.
-    ("s09", S4P,  0.0, 17.5,  [("07b_ask", 0.2)],                 1.0),
-    ("s10", S5,  23.2, 38.0,  [("09_reviewers", 0.3), ("10_dave", 7.7),
-                               ("11_watcher", 18.2), ("12_credit", 27.9),
-                               ("13_measured", 36.0)],            0.16),
-    ("s11", "CARD:table", 0, 13.5, [("14_table", 0.3)],           0.0),
-    ("s12", S5,  62.0,  5.0,  [("15_limit", 0.3)],                0.16),
-    ("s13", "CARD:close", 0, 6.3, [("16_close", 0.3)],            0.0),
-    ("s14", "CARD:end", 0, 2.0, [("17_name", 0.3)],               0.0),
+    ("s01", S1,   0.0,  6.0,  [],                                 1.0),
+    ("s02", S5,   0.0,  8.0,  [("01_gap", 0.2)],                  0.22),
+    ("s03", S5,   8.4, 10.0,  [("02_exists", 0.2)],               0.22),
+    ("s04", "CARD:mark", 0, 6.5, [("03_built", 0.2)],             0.0),
+    ("s05", S2,   0.0, 16.0,  [("04a_doing", 6.8), ("04b_how", 14.3)], 1.0),
+    ("s06", "CARD:later", 0, 1.8, [],                             0.0),
+    ("s07", S3,   0.0, 12.8,  [("05_same", 0.3)],                 1.0),
+    ("s07b", S3B, 0.0,  8.3,  [("05b_signs_gap", 0.2)],           1.0),
+    ("s07c", S3C, 0.0, 10.2,  [],                                 1.0),
+    # after the handoff announcement (1.8-3.3s), not over it.
+    ("s08", S4TV, 0.0, 11.8,  [("06_tworoom", 3.5)],              0.85),
+    # the answer starts 5.0s in; this has to be finished before it.
+    ("s09", S4P,  0.0, 11.5,  [("07b_ask", 0.2)],                 1.0),
+    ("s10", S5,  24.1, 31.0,  [("09_reviewers", 0.2), ("10_dave", 7.6),
+                               ("11_watcher", 15.4), ("12_credit", 21.9),
+                               ("13_measured", 27.6)],            0.16),
+    ("s11", "CARD:table", 0, 13.5, [("14_table", 0.2)],           0.0),
+    ("s12", S5,  56.0,  5.0,  [("15_limit", 0.2)],                0.16),
+    ("s13", "CARD:close", 0, 6.3, [("16_close", 0.2)],            0.0),
+    ("s14", "CARD:end", 0, 2.0, [("17_name", 0.2)],               0.0),
 ]
 
 TAIL = 0.45
@@ -187,17 +185,19 @@ LIMIT = 180.0        # the rules say under three minutes
 MUSIC = "dreamscape"
 MUSIC_FROM = 60.0        # past the opening ramp
 
-# Target RMS per segment, in dBFS. None means silence -- and the three Nones
+# Target RMS per segment, in dBFS. None means silence -- and the four Nones
 # are the argument of the film:
-#   s01  the seven seconds with no description. Scoring it destroys the point.
-#   s07  the described passage. This is the exhibit.
-#   s09  the phone answering a question. Also the exhibit.
+#   s01   the six seconds with no description. Scoring it destroys the point.
+#   s07   the described passage. This is the exhibit.
+#   s07c  the sign-language passage voiced on the television. Also the exhibit.
+#   s09   the phone answering a question. Also the exhibit.
 MUSIC_DB = {
     "s01": None,   "s02": -41.0, "s03": -41.0, "s04": -37.0,
     "s05": -45.0,  # the app narrating itself; present, never competing
     "s06": -33.0,  # a card with nothing spoken over it
-    "s07": None,   "s08": -43.0, "s09": None,  "s10": -41.0,
-    "s11": -37.0,  "s12": -41.0, "s13": -37.0, "s14": -33.0,
+    "s07": None,   "s07b": -41.0, "s07c": None,
+    "s08": -43.0,  "s09": None,   "s10": -41.0,
+    "s11": -37.0,  "s12": -41.0,  "s13": -37.0, "s14": -33.0,
 }
 RAMP = 0.9               # seconds to fade in or out of a region
 

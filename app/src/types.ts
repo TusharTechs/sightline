@@ -1,3 +1,11 @@
+export interface SignInfo {
+  found: boolean;
+  kind: 'none' | 'gesture' | 'sign_language' | 'written_sign';
+  raw_meaning: string;
+  transcript_entry: string;
+  spoken_description: string;
+}
+
 /** A single spoken description, positioned on the media timeline. */
 export interface Cue {
   /** Media time (seconds) at which this becomes relevant. */
@@ -12,6 +20,8 @@ export interface Cue {
   text: string;
   /** Rendered duration in seconds, measured host-side. */
   duration: number;
+  /** Present when this cue translates a silent hand sign, gesture, or sign language. */
+  sign?: SignInfo;
 }
 
 export type Mode = 'fit' | 'pause';
