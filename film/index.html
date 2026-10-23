@@ -170,12 +170,15 @@
 
 
 <nav aria-labelledby="morehead">
-  <h2 id="morehead">Three more videos, all described by this</h2>
+  <h2 id="morehead">More videos, all described by this</h2>
   <p class="sub">None of these had audio description until this wrote it.</p>
   <ul>
     <li><a href="../film/">Sintel — three minutes of the film</a>
       <span class="what">The film itself, where there is a story to follow —
       the clip above is only its trailer. 24 descriptions.</span></li>
+    <li><a href="../signs/">Parents Supporting Children — American Sign Language</a>
+      <span class="what">Zero spoken words (-91 dB silence). 4 sign-language
+      passages translated into spoken English and written into the transcript.</span></li>
     <li><a href="../duck/">Duck and Cover — 1951 civil defence film</a>
       <span class="what">Narrated almost end to end, so there is barely room
       to speak. The hard case: 11 descriptions in the gaps that exist.</span></li>
@@ -588,7 +591,7 @@
   function videoId() {
     const parts = location.pathname.split('/').filter(Boolean);
     const last = parts[parts.length - 1] || '';
-    return (last === 'film' || last === 'duck') ? last : '';
+    return (last === 'film' || last === 'duck' || last === 'signs') ? last : '';
   }
 
   async function askLocal(question) {

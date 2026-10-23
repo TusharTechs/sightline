@@ -1,0 +1,44 @@
+{
+  "jobName": "sightline-395227a12a32",
+  "accountId": "756590016817",
+  "status": "COMPLETED",
+  "results": {
+    "transcripts": [
+      {
+        "transcript": ""
+      }
+    ],
+    "items": [],
+    "audio_segments": [],
+    "signs": [
+      {
+        "t": 0.0,
+        "kind": "sign_language",
+        "raw_meaning": "ASL video series: Parents supporting children \u2014 presented by Amy E. Peterson, Certified Deaf Interpreter",
+        "spoken_description": "An interpreter signs the series title, Parents Supporting Children; a caption names Amy Peterson, Deaf interpreter.",
+        "transcript_entry": "[Sign: \"ASL video series: Parents supporting children \u2014 presented by Amy E. Peterson, Certified Deaf Interpreter\"]"
+      },
+      {
+        "t": 6.171,
+        "kind": "sign_language",
+        "raw_meaning": "Two \u2014 the second point, pointing to it",
+        "spoken_description": "She signs the number two, marking a second point, then points to it.",
+        "transcript_entry": "[Sign: \"Two \u2014 the second point, pointing to it\"]"
+      },
+      {
+        "t": 12.341,
+        "kind": "sign_language",
+        "raw_meaning": "Working together to support and communicate with each other",
+        "spoken_description": "She signs about people working together, supporting one another, and communicating as a group.",
+        "transcript_entry": "[Sign: \"Working together to support and communicate with each other\"]"
+      },
+      {
+        "t": 18.512,
+        "kind": "sign_language",
+        "raw_meaning": "Rules and standards must be followed, with careful attention and explanation",
+        "spoken_description": "A woman signs about following rules and standards, explaining each point with careful, deliberate hands.",
+        "transcript_entry": "[Sign: \"Rules and standards must be followed, with careful attention and explanation\"]"
+      }
+    ]
+  }
+}

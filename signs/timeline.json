@@ -1,0 +1,81 @@
+{
+  "media": "content.mp4",
+  "mimeCodec": "video/mp4; codecs=\"avc1.640028,mp4a.40.2\"",
+  "videoWidth": 1920,
+  "videoHeight": 1080,
+  "pictureRect": {
+    "x": 0.0,
+    "y": 0.0,
+    "w": 1.0,
+    "h": 1.0
+  },
+  "mode": "fit",
+  "builtForRate": 1.0,
+  "gaps": [],
+  "cues": [
+    {
+      "t": 0.0,
+      "rank": 4,
+      "pcm": "desc-04.pcm",
+      "text": "The interpreter signs the title: Parents Supporting Children.",
+      "duration": 3.505,
+      "caused_by_viewer": false,
+      "why_ranked": "series title and presenter credit, decorative",
+      "sign": {
+        "found": true,
+        "kind": "sign_language",
+        "raw_meaning": "ASL video series: Parents supporting children \u2014 presented by Amy E. Peterson, Certified Deaf Interpreter",
+        "transcript_entry": "[Sign: \"ASL video series: Parents supporting children \u2014 presented by Amy E. Peterson, Certified Deaf Interpreter\"]",
+        "spoken_description": "An interpreter signs the series title, Parents Supporting Children; a caption names Amy Peterson, Deaf interpreter."
+      }
+    },
+    {
+      "t": 6.171,
+      "rank": 3,
+      "pcm": "desc-03.pcm",
+      "text": "She signs the number two, marking a second point, then points to it.",
+      "duration": 3.914,
+      "caused_by_viewer": false,
+      "why_ranked": "signed structural marker locating us in the list",
+      "sign": {
+        "found": true,
+        "kind": "sign_language",
+        "raw_meaning": "Two \u2014 the second point, pointing to it",
+        "transcript_entry": "[Sign: \"Two \u2014 the second point, pointing to it\"]",
+        "spoken_description": "She signs the number two, marking a second point, then points to it."
+      }
+    },
+    {
+      "t": 12.341,
+      "rank": 1,
+      "pcm": "desc-01.pcm",
+      "text": "She signs about people working together, supporting one another, and communicating as a group.",
+      "duration": 4.928,
+      "caused_by_viewer": false,
+      "why_ranked": "silent signed content carrying the core message",
+      "sign": {
+        "found": true,
+        "kind": "sign_language",
+        "raw_meaning": "Working together to support and communicate with each other",
+        "transcript_entry": "[Sign: \"Working together to support and communicate with each other\"]",
+        "spoken_description": "She signs about people working together, supporting one another, and communicating as a group."
+      }
+    },
+    {
+      "t": 18.512,
+      "rank": 2,
+      "pcm": "desc-02.pcm",
+      "text": "She signs about following rules and standards, explaining each point with careful, deliberate hands.",
+      "duration": 5.671,
+      "caused_by_viewer": false,
+      "why_ranked": "signed substance about rules and explanation, invisible otherwise",
+      "sign": {
+        "found": true,
+        "kind": "sign_language",
+        "raw_meaning": "Rules and standards must be followed, with careful attention and explanation",
+        "transcript_entry": "[Sign: \"Rules and standards must be followed, with careful attention and explanation\"]",
+        "spoken_description": "A woman signs about following rules and standards, explaining each point with careful, deliberate hands."
+      }
+    }
+  ]
+}

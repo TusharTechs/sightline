@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sightline</title>
+<!-- Inline favicon. A linked file would need to exist next to every copy of
+     this page, and the page is deployed into several directories; a data URI
+     travels with it. Dark tile behind the mark so it reads on a light tab
+     bar as well as a dark one -- the bare stroke mark vanishes on one. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%230b0f14%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f2f5f8%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cline%20x1%3D%2211%22%20y1%3D%2232%22%20x2%3D%2228%22%20y2%3D%2232%22%2F%3E%3Cpath%20d%3D%22M33%2021a15%2015%200%200%201%200%2022%22%2F%3E%3Cpath%20d%3D%22M41%2015a25%2025%200%200%201%200%2034%22%20opacity%3D%22.62%22%2F%3E%3Cpath%20d%3D%22M49%2010a34%2034%200%200%201%200%2044%22%20opacity%3D%22.32%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20width%3D%2264%22%20height%3D%2264%22%20rx%3D%2214%22%20fill%3D%22%230b0f14%22%2F%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%23f2f5f8%22%20stroke-width%3D%225%22%20stroke-linecap%3D%22round%22%3E%3Cline%20x1%3D%2211%22%20y1%3D%2232%22%20x2%3D%2228%22%20y2%3D%2232%22%2F%3E%3Cpath%20d%3D%22M33%2021a15%2015%200%200%201%200%2022%22%2F%3E%3Cpath%20d%3D%22M41%2015a25%2025%200%200%201%200%2034%22%20opacity%3D%22.62%22%2F%3E%3Cpath%20d%3D%22M49%2010a34%2034%200%200%201%200%2044%22%20opacity%3D%22.32%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px 18px calc(20px + env(safe-area-inset-bottom));
+    background: #0b0f14; color: #f2f5f8;
+    font: 17px/1.5 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif;
+  }
+  h1 { font-size: 21px; margin: 0; }
+  /* The mark sits beside the name, not instead of it. It carries no label and
+     is hidden from assistive technology: the <h1> next to it already says
+     "Sightline", and an SVG with its own title would have a screen reader
+     announce the name twice before the page has said anything useful. */
+  .brand { display: flex; align-items: center; gap: 11px; margin: 0 0 2px; }
+  .brand svg { flex: none; width: 30px; height: 30px; }
+  .sub { color: #8797a8; font-size: 15px; margin-bottom: 20px; }
+
+  /* Touch targets are deliberately large. This is operated without looking. */
+  button {
+    display: block; width: 100%; min-height: 68px; margin-bottom: 12px;
+    /* Longhands, not the `font` shorthand. `inherit` is not a valid family
+       inside that shorthand, so the whole declaration was being dropped and
+       every button fell back to the UA default -- Arial at 13.3px, which is
+       why the page was not in the system font. On the text field the same
+       mistake was worse: under 16px, iOS zooms the page the moment the field
+       is focused, which threw the layout sideways mid-question. */
+    font-weight: 600; font-size: 19px; line-height: 1.3; font-family: inherit;
+    color: #f2f5f8;
+    background: #1b2530; border: 2px solid #2f3f50; border-radius: 14px;
+    padding: 16px; text-align: left;
+  }
+  button.primary { background: #1f6feb; border-color: #1f6feb; }
+  button.quick { min-height: 58px; font-size: 17px; font-weight: 500; }
+  button:disabled { opacity: 0.55; }
+
+  /* Matches the buttons around it. 19px is deliberate: iOS Safari zooms the
+     whole page when a focused input's text is under 16px, which on a phone
+     held one-handed throws the layout sideways mid-question. */
+  #askText {
+    display: block; width: 100%; min-height: 62px; margin-bottom: 12px;
+    font-weight: 400; font-size: 19px; line-height: 1.3; font-family: inherit;
+    color: #f2f5f8;
+    background: #121a23; border: 2px solid #2f3f50; border-radius: 14px;
+    padding: 16px; -webkit-appearance: none;
+  }
+  #askText::placeholder { color: #8fa1b3; }
+  #askText:focus-visible { outline: 3px solid #3ddc97; outline-offset: 2px; }
+  #askForm { margin: 0; }
+  button:active { transform: scale(0.99); }
+  button[aria-pressed="true"] { border-color: #3ddc97; }
+  button:focus-visible { outline: 3px solid #3ddc97; outline-offset: 2px; }
+
+  .status { border: 2px solid #2f3f50; border-radius: 14px; padding: 16px; margin-bottom: 18px; }
+  .status b { display: block; font-size: 19px; margin-bottom: 4px; }
+  .dim { color: #8797a8; font-size: 15px; }
+  .said { margin-top: 18px; }
+  nav { margin: 26px 0 8px; padding-top: 18px; border-top: 1px solid #1f2a36; }
+  nav h2 { font-size: 15px; margin: 0 0 10px; }
+  nav ul { list-style: none; padding: 0; margin: 0; }
+  nav li { margin: 0 0 12px; }
+  nav a { color: #7fb4e0; }
+  nav .what { display: block; color: #8797a8; font-size: 14px; margin-top: 2px; }
+  .said h2 { font-size: 15px; color: #8797a8; margin: 0 0 8px; font-weight: 600; }
+  .said li { margin-bottom: 10px; padding-left: 0; list-style: none; }
+  .said .t { color: #8797a8; font-size: 14px; }
+  /* Visible only to screen readers — the live region does the real talking. */
+  video { width: 100%; border-radius: 12px; background: #000; margin-bottom: 14px; display: block; }
+  video[hidden] { display: none; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+</style>
+
+<div class="brand">
+  <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <g fill="none" stroke="#f2f5f8" stroke-width="4.5" stroke-linecap="round">
+      <line x1="6" y1="32" x2="26" y2="32"/>
+      <path d="M32 20a16 16 0 0 1 0 24"/>
+      <path d="M40 14a26 26 0 0 1 0 36" opacity=".62"/>
+      <path d="M48 8a36 36 0 0 1 0 48" opacity=".32"/>
+    </g>
+  </svg>
+  <h1>Sightline</h1>
+</div>
+<p class="sub" id="tagline">Audio description for content that has none.</p>
+
+<!-- Standalone mode. Almost nobody evaluating this has a Fire TV, and a blind
+     tester certainly will not install an SDK — so the same timeline, the same
+     description audio and the same question endpoint drive a plain video
+     element here. It is the product, minus the television. -->
+<video id="film" playsinline controls preload="metadata" aria-label="Film with generated audio description"></video>
+
+<button id="start" class="primary" aria-keyshortcuts="Escape">Play with description</button>
+<button id="follow" aria-keyshortcuts="Escape">Follow a Fire TV instead</button>
+<!-- Discoverability is half the fix. A reviewer who could not find a way to
+     stop was not helped by the fact that one existed. This line appears once
+     playback starts and is not written to by tick(), unlike #detail. -->
+<p class="sub" id="stopHint" hidden>Press Escape at any time to stop.</p>
+
+<!-- Deliberately NOT a live region. It holds a position that changes every
+     second, and a live region would have a screen reader read the clock out
+     loud forever. State changes are announced once, explicitly, through the
+     assertive region below. The text stays here to be read on demand. -->
+<div class="status">
+  <b id="statusLine">Ready</b>
+  <span class="dim" id="detail">Press Play with description to start.</span>
+</div>
+
+
+
+<!-- When the answering service is not reachable, say so rather than hiding
+     the feature. A reader who was told the description is "answerable
+     mid-scene" and then finds nothing has been promised something that is not
+     there; an explained absence is honest and a silent one is not. -->
+<section id="askUnavailable" hidden aria-labelledby="askOffHead">
+  <h2 id="askOffHead" class="sub" style="margin:22px 0 8px">Asking about this moment</h2>
+  <p class="sub">Asking is temporarily unreachable. The answer is generated
+  from the frame on screen at that second, so it needs the service to
+  respond; the description itself keeps playing regardless.</p>
+</section>
+
+<section id="askSection" hidden aria-labelledby="askHead">
+  <h2 id="askHead" class="sub" style="margin:22px 0 10px">Ask about this moment</h2>
+  <button id="askVoice" class="primary">Hold to ask a question</button>
+  <!-- Typing has to be here, not just the voice button and three presets.
+       SpeechRecognition does not exist in iOS Safari, so on an iPhone the
+       voice button disables itself and "ask anything about the video" quietly
+       became "pick one of three" -- on the platform where most VoiceOver users
+       are. A plain text field restores both halves of it: any question at all,
+       and real speech, because the iOS keyboard's dictation key puts the whole
+       system speech engine behind this input. -->
+  <form id="askForm" autocomplete="off">
+    <label for="askText" class="sub" style="display:block;margin:2px 0 6px">
+      Or type a question — the keyboard's microphone key works too
+    </label>
+    <input id="askText" type="text" name="q" enterkeyhint="send"
+           placeholder="Ask anything about this moment"
+           aria-describedby="askHead">
+    <button type="submit" class="quick">Ask</button>
+  </form>
+  <button class="quick" data-q="What's happening right now?">What's happening right now?</button>
+  <button class="quick" data-q="Who else is in this scene?">Who else is in this scene?</button>
+  <button class="quick" data-q="What is she carrying?">What is she carrying?</button>
+  <button class="quick" data-q="Did anyone just make a hand sign or gesture, or is there a sign on screen?">Any sign or gesture just now?</button>
+  <div class="status" id="answerBox" role="status" aria-live="polite" hidden>
+    <b id="answerText"></b>
+    <span class="dim" id="answerMeta"></span>
+  </div>
+</section>
+
+<!-- Append-only, and deliberately so. This list was written newest-first,
+     which meant every new description shifted every existing entry down. A
+     screen reader whose cursor was sitting on one of those entries had it
+     moved out from under it, and played its "nothing here" tone -- once per
+     description, which is what a listener reported as a repeating donk. role
+     is log, which is append-only by definition, and updates are not announced
+     because the line is being spoken aloud at the same moment anyway. -->
+<!-- A judge or a reviewer who lands here can otherwise play one clip and has
+     nowhere to go. The three-minute stretch of the actual film and the
+     listening test were both unreachable from anywhere until this existed. -->
+
+
+<nav aria-labelledby="morehead">
+  <h2 id="morehead">More videos, all described by this</h2>
+  <p class="sub">None of these had audio description until this wrote it.</p>
+  <ul>
+    <li><a href="../film/">Sintel — three minutes of the film</a>
+      <span class="what">The film itself, where there is a story to follow —
+      the clip above is only its trailer. 24 descriptions.</span></li>
+    <li><a href="../signs/">Parents Supporting Children — American Sign Language</a>
+      <span class="what">Zero spoken words (-91 dB silence). 4 sign-language
+      passages translated into spoken English and written into the transcript.</span></li>
+    <li><a href="../duck/">Duck and Cover — 1951 civil defence film</a>
+      <span class="what">Narrated almost end to end, so there is barely room
+      to speak. The hard case: 11 descriptions in the gaps that exist.</span></li>
+    <li><a href="../listen/">Can you hear what the machine hears?</a>
+      <span class="what">Nineteen clips, scored in your browser. Is the
+      difference this software hears audible to you?</span></li>
+    <li><a href="https://github.com/TusharTechs/sightline">The code, and how it was built</a>
+      <span class="what">What two blind reviewers changed, and where this
+      approach stops working.</span></li>
+  </ul>
+</nav>
+
+<div class="said">
+  <h2 id="saidHead">Described so far</h2>
+  <ul id="log" role="log" aria-live="off" aria-labelledby="saidHead"></ul>
+</div>
+
+<div class="sr" aria-live="assertive" id="announce"></div>
+
+<script>
+(() => {
+  const el = (id) => document.getElementById(id);
+  const statusLine = el('statusLine'), detail = el('detail'), log = el('log');
+  const announce = el('announce'), startBtn = el('start');
+  const askSection = el('askSection'), askVoice = el('askVoice');
+  const answerBox = el('answerBox'), answerText = el('answerText'),
+        answerMeta = el('answerMeta');
+  let lastT = 0;
+
+  const film = el('film'), followBtn = el('follow');
+  // 'standalone' plays the film here; 'follow' tracks a Fire TV.
+  let mode = 'standalone';
+  let started = false;   // begin() has run; the buttons are toggles from here
+  let ctx = null;            // unlocked by the Start gesture; mobile requires it
+  let timeline = null;
+  const srcs = new Map();     // rank -> url of the spoken line
+  const played = new Set();
+  let running = false, lastState = null, tickTimer = null;
+  let lastAge = null;
+
+  // Never write an empty string here. Clearing a live region before writing
+  // to it is a common trick for forcing a re-announcement, and it is why a
+  // listener heard VoiceOver's empty-element tone over and over instead of
+  // speech: an assertive region that changes to nothing is still a change,
+  // and nothing is what gets announced. To repeat an identical message,
+  // toggle an invisible character instead.
+  let lastSaid = '';
+  const say = (msg) => {
+    if (!msg) return;
+    const out = (msg === lastSaid) ? msg + '\u200B' : msg;
+    lastSaid = out;
+    announce.textContent = out;
+  };
+
+  // Writing the same string into a live region is still a mutation, and a
+  // screen reader reads it again. tick() runs four times a second, so an
+  // unguarded assignment made VoiceOver repeat "Paused, 52 seconds in"
+  // forever -- and kept doing it after the reader had left the page, because
+  // the interval kept running. Only ever write when the text actually changes.
+  const setText = (node, text) => { if (node.textContent !== text) node.textContent = text; };
+
+  // Descriptions play through plain audio elements, not through the Web Audio
+  // graph.
+  //
+  // They used to be decoded buffers. That works on a desktop and is fragile on
+  // iOS, where the audio context suspends whenever the page goes away and does
+  // not reliably come back: a buffer started into a suspended context makes no
+  // sound. Guarding against that by refusing to play until the context was
+  // running turned an intermittent loss into a total one for the listener who
+  // reported it -- every description gone. Two attempts at fixing this from a
+  // desktop browser made it worse each time.
+  //
+  // An audio element does not care about the context's state. It needs
+  // unlocking once, inside the gesture that starts playback, which is what
+  // the pool below is for. The context is now only used to duck the film, and
+  // if ducking fails the description is merely hard to hear rather than
+  // absent. That is the right way round.
+  const VOICES = 3;
+  let voices = [], voiceAt = 0;
+  function makeVoices() {
+    if (voices.length) return;
+    for (let i = 0; i < VOICES; i++) {
+      const a = new Audio();
+      a.preload = 'auto';
+      voices.push(a);
+    }
+  }
+  function unlockVoices() {
+    // Must happen inside the user gesture. Playing silence marks each element
+    // as user-initiated, so later programmatic play() calls are allowed.
+    for (const a of voices) {
+      a.muted = true;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => {});
+      a.pause();
+      a.currentTime = 0;
+      a.muted = false;
+    }
+  }
+
+  async function fetchBuffer(cue) {
+    // Static hosting serves mp3 (a twenty-fifth of the bytes); the local
+    // service wraps the device's PCM as wav on the way out. Try the small one
+    // first so a tester on mobile data is not made to wait for either.
+    const base = cue.pcm.replace(/\.pcm$/, '');
+    for (const ext of ['.mp3', '.wav']) {
+      try {
+        const res = await fetch(base + ext, {method: 'HEAD'});
+        if (!res.ok) continue;
+        srcs.set(cue.rank, base + ext);
+        return;
+      } catch {}
+    }
+  }
+
+  const srcFor = (cue) => srcs.get(cue.rank);
+
+  function play(cue) {
+    const url = srcFor(cue);
+    if (!url) return false;
+    const a = voices[voiceAt++ % voices.length];
+    a.src = url;
+    const p = a.play();
+    if (p && p.catch) p.catch(() => {});
+    // Duck for as long as the timeline says the line runs. The context may be
+    // asleep; waking it is worth attempting but the description does not wait
+    // on it.
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    duckFilm(cue.duration || 4);
+    // Append, never prepend: adding at the end leaves every existing entry
+    // where it was, so a reader's cursor stays valid. Plain text nodes rather
+    // than innerHTML, for the same reason -- less for the reader to re-walk.
+    const li = document.createElement('li');
+    const stamp = document.createElement('span');
+    stamp.className = 't';
+    const signEntry = cue.sign && cue.sign.transcript_entry ? ` · ${cue.sign.transcript_entry}` : '';
+    stamp.textContent = `${cue.t.toFixed(1)}s${signEntry}`;
+    li.append(stamp, document.createElement('br'),
+              document.createTextNode(cue.text));
+    log.append(li);
+    return true;
+  }
+
+  async function loadTimeline(tl) {
+    if (timeline) return;
+    timeline = tl;
+    await Promise.all(timeline.cues.map(fetchBuffer));
+    if (mode === 'standalone') film.src = timeline.media;
+    say(`Ready. ${timeline.cues.length} descriptions.`);
+  }
+
+  async function connect() {
+    // Standalone reads the timeline straight off disk. It must not depend on a
+    // service endpoint — the hosted build is static files and nothing else, and
+    // asking it for /state is how this silently failed to start.
+    if (mode === 'standalone') {
+      if (!timeline) {
+        await loadTimeline(await (await fetch('timeline.json')).json());
+      }
+      return null;
+    }
+    const s = await (await fetch('state')).json();
+    if (s.timeline) await loadTimeline(s.timeline);
+    return s;
+  }
+
+  // Watching it a second time should describe it a second time.
+  //
+  // Cues were marked spent for the life of the page, so replaying the film
+  // played it silently: every description had already been used up, and only
+  // reloading brought them back. Reported by a listener who did exactly what
+  // anyone would do, which is watch it again.
+  //
+  // Any jump backwards -- replay, scrub, or the film ending and starting over
+  // -- releases every cue at or after the new position. Cues before it stay
+  // spent, so scrubbing back a little does not replay the whole film at you.
+  let cueClock = 0;
+  function rewindCues(t) {
+    for (const cue of timeline.cues) {
+      if (cue.t >= t - 0.25) played.delete(cue.rank);
+    }
+  }
+
+  function fireCues(t) {
+    if (!timeline) return;
+    if (t < cueClock - 0.5) rewindCues(t);
+    cueClock = t;
+    for (const cue of timeline.cues) {
+      if (played.has(cue.rank) || cue.t > t) continue;
+      if (t - cue.t < 4) {
+        // Only mark it spent if it actually made a sound.
+        if (play(cue)) played.add(cue.rank);
+      } else {
+        // Its moment has passed -- do not speak it late over a later scene.
+        played.add(cue.rank);
+      }
+    }
+  }
+
+  // Standalone: the film is here, so duck it under each description exactly as
+  // the television does. Without this the score buries the voice at its peaks.
+  //
+  // This cannot be done with film.volume. On iOS that property is read-only:
+  // assigning to it is silently ignored, so the duck did nothing on exactly the
+  // devices most likely to be used with VoiceOver, and a blind reviewer lost
+  // the description under the score. Reported by a listener on an iPhone, not
+  // caught here, because it works on a desktop browser.
+  //
+  // Routing the film through a gain node works everywhere. Once an element is
+  // connected to the graph its audio only reaches the speakers through the
+  // graph, so the connection has to be made before playback and kept.
+  let duckTimer = null, filmGain = null;
+  function routeFilm() {
+    if (filmGain || !ctx) return;
+    try {
+      const src = ctx.createMediaElementSource(film);
+      filmGain = ctx.createGain();
+      src.connect(filmGain).connect(ctx.destination);
+    } catch { filmGain = null; }   // already routed, or not permitted
+  }
+  function setFilmGain(v, seconds) {
+    if (filmGain) {
+      const now = ctx.currentTime;
+      filmGain.gain.cancelScheduledValues(now);
+      filmGain.gain.setValueAtTime(filmGain.gain.value, now);
+      filmGain.gain.linearRampToValueAtTime(v, now + seconds);
+    } else {
+      film.volume = v;           // desktop fallback if routing was refused
+    }
+  }
+  function duckFilm(seconds) {
+    if (mode !== 'standalone') return;
+    clearTimeout(duckTimer);
+    setFilmGain(0.22, 0.14);
+    duckTimer = setTimeout(() => setFilmGain(1, 0.26), seconds * 1000 + 260);
+  }
+
+  async function tick() {
+    if (!running) return;
+    if (mode === 'standalone') {
+      lastT = film.currentTime || 0;
+      const now = film.paused ? 'Paused' : 'Playing';
+      if (now !== lastState) { if (lastState !== null) say(now); lastState = now; }
+      setText(statusLine, now);
+      setText(detail, `${lastT.toFixed(0)} seconds in`);
+      fireCues(lastT);
+      return;
+    }
+    let s;
+    try { s = await connect(); }
+    catch { setText(statusLine, 'Lost the television'); setText(detail, 'Trying again.'); return; }
+
+    // The TV reports its position a few times a second; estimate between reports
+    // so description does not arrive in steps.
+    const age = s.age == null ? null : s.age;
+    const t = s.playing && age != null ? s.t + age * (s.rate || 1) : s.t;
+    lastT = t;
+
+    if (age == null || age > 3) {
+      setText(statusLine, 'Waiting for the television');
+      setText(detail, 'Start playback on the Fire TV.');
+    } else {
+      setText(statusLine, s.playing ? 'Playing' : 'Paused');
+      setText(detail, `${t.toFixed(0)} seconds in, ${s.rate || 1}x speed`);
+      if (lastAge !== null && (age > 3) !== (lastAge > 3)) say(statusLine.textContent);
+      lastAge = age;
+    }
+
+    if (timeline) {
+      // Same rule in follow mode: if the television went back, so do we.
+      if (t < cueClock - 0.5) rewindCues(t);
+      cueClock = t;
+      for (const cue of timeline.cues) {
+        if (!played.has(cue.rank) && cue.t <= t && t - cue.t < 4) {
+          if (play(cue)) played.add(cue.rank);
+        }
+      }
+    }
+  }
+
+  async function begin(which) {
+    mode = which;
+    // Both of these must happen inside the click, before any await: iOS only
+    // grants audio permission synchronously within the gesture.
+    makeVoices();
+    unlockVoices();
+    if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === 'suspended') await ctx.resume();
+    running = true;
+    started = true;
+    el('stopHint').hidden = false;
+    startBtn.classList.remove('primary');
+    await connect();
+    if (mode === 'standalone') {
+      startBtn.textContent = 'Pause';
+      followBtn.hidden = true;
+      film.hidden = false;
+      // Route before the first play, while we are still inside the gesture
+      // that unlocked the context.
+      routeFilm();
+      // Asking works everywhere now. There is a hosted answerer behind the
+      // page, so this no longer has to be hidden when no local service is
+      // running -- which was the case for everybody who opened the public
+      // link, meaning the feature existed for nobody it was built for.
+      askSection.hidden = false;
+      el('askUnavailable').hidden = true;
+      say('Playing with description.');
+      try { await film.play(); } catch { say('Press play on the video.'); }
+    } else {
+      startBtn.hidden = true;
+      askSection.hidden = false;
+      followBtn.textContent = 'Stop following';
+      film.hidden = true;
+      say('Listening for the television.');
+    }
+    tick();
+    startTicking();
+  }
+
+  function startTicking() {
+    if (tickTimer === null) tickTimer = setInterval(tick, 250);
+  }
+
+  // Until this existed there was no way to stop. `running` was set true once
+  // and never set false, the 250ms tick ran for the life of the tab, and a
+  // description already being spoken had no control attached to it at all.
+  // A blind reviewer reported the only way out was closing the tab, which is
+  // the correct description of what the page did.
+  //
+  // Pausing the film is not enough on its own: description plays through its
+  // own audio elements, so a line in progress keeps speaking over a paused
+  // film unless it is stopped too.
+  function haltPlayback() {
+    running = false;
+    if (tickTimer !== null) { clearInterval(tickTimer); tickTimer = null; }
+    for (const a of voices) { try { a.pause(); a.currentTime = 0; } catch (e) {} }
+    clearTimeout(duckTimer);
+    setFilmGain(1, 0.08);
+    if (mode === 'standalone') { try { film.pause(); } catch (e) {} }
+  }
+
+  function resumePlayback() {
+    running = true;
+    startTicking();
+    if (mode === 'standalone') { const p = film.play(); if (p && p.catch) p.catch(() => {}); }
+  }
+
+  function togglePlayback() {
+    if (running) {
+      haltPlayback();
+      startBtn.textContent = mode === 'standalone' ? 'Resume' : 'Resume following';
+      followBtn.textContent = 'Resume following';
+      say('Paused.');
+    } else {
+      resumePlayback();
+      startBtn.textContent = mode === 'standalone' ? 'Pause' : 'Stop following';
+      followBtn.textContent = 'Stop following';
+      say(mode === 'standalone' ? 'Playing.' : 'Following again.');
+    }
+  }
+  function stopTicking() {
+    if (tickTimer !== null) { clearInterval(tickTimer); tickTimer = null; }
+  }
+  // A backgrounded tab keeps its timers, so without this the loop carries on
+  // after the reader has left the page.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { stopTicking(); return; }
+    if (!running) return;
+    // The context is suspended while the page is away and does not come back
+    // by itself, so every description after the first interruption would be
+    // silent without this.
+    if (ctx && ctx.state !== 'running') ctx.resume().catch(() => {});
+    startTicking();
+  });
+
+  startBtn.addEventListener('click', () => {
+    if (!started) begin('standalone'); else togglePlayback();
+  });
+  followBtn.addEventListener('click', () => {
+    if (!started) begin('follow'); else togglePlayback();
+  });
+
+  // Escape stops everything, from anywhere on the page. A listener who wants
+  // it to stop should not have to find a control first.
+  addEventListener('keydown', (e) => {
+    const t = e.target;
+    const typing = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+    if (typing || !started) return;
+    if (e.key === 'Escape' && running) { e.preventDefault(); togglePlayback(); }
+  });
+  film.hidden = true;
+
+  // Interactive description. The Fire TV has no app-level speech recognition,
+  // so a spoken question can only ever begin on this device — which is the
+  // reason the companion channel had to exist before this could.
+  // Two answerers, and the page does not care which it gets.
+  //
+  // A local service is preferred when one is running: it is on the same
+  // machine as the film and can pull any frame out of it. When there is not
+  // one -- which is the case for everybody who opens the public link -- the
+  // question goes to a hosted endpoint instead, which reads a pre-extracted
+  // frame and the transcript from this same site.
+  //
+  // Without the second path the feature existed only for whoever had the
+  // repository checked out, which is nobody this was built for.
+  const HOSTED_ASK = 'https://s4i9xx7htg.execute-api.us-east-1.amazonaws.com';
+
+  // Which clip this copy of the page is showing, from the directory it sits
+  // in. The hosted answerer needs to know which film to read.
+  function videoId() {
+    const parts = location.pathname.split('/').filter(Boolean);
+    const last = parts[parts.length - 1] || '';
+    return (last === 'film' || last === 'duck' || last === 'signs') ? last : '';
+  }
+
+  async function askLocal(question) {
+    const res = await fetch('ask', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question, t: lastT}),
+    });
+    if (!res.ok) throw new Error('local unavailable');
+    return res.json();
+  }
+
+  async function askHosted(question) {
+    const res = await fetch(HOSTED_ASK, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({question, t: lastT, video: videoId()}),
+    });
+    return res.json();
+  }
+
+  async function ask(question) {
+    answerBox.hidden = false;
+    answerText.textContent = 'Asking…';
+    answerMeta.textContent = question;
+    say('Asking.');
+    try {
+      let a;
+      try { a = await askLocal(question); }
+      catch { a = await askHosted(question); }
+
+      if (a.error) {
+        answerText.textContent = 'Could not answer.';
+        answerMeta.textContent = a.error;
+        return say('Could not answer.');
+      }
+      answerText.textContent = a.answer;
+      answerMeta.textContent = `asked at ${a.asked_at}s`;
+      // Announce immediately. A blind listener should not have to wait on an
+      // audio download to know the answer arrived.
+      say(a.answer);
+
+      // The local service returns a URL to fetch; the hosted one returns the
+      // audio inline, because a second round trip on a phone is worse than a
+      // slightly larger reply.
+      let buf;
+      if (a.audio_mp3_b64) {
+        const bin = atob(a.audio_mp3_b64);
+        const bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        buf = bytes.buffer;
+      } else if (a.audio) {
+        buf = await (await fetch(a.audio)).arrayBuffer();
+      } else {
+        return;                       // text arrived, speech did not; not fatal
+      }
+      const decoded = await ctx.decodeAudioData(buf);
+      const src = ctx.createBufferSource();
+      src.buffer = decoded;
+      src.connect(ctx.destination);
+      src.start();
+    } catch (e) {
+      answerText.textContent = 'Could not reach the service.';
+      say('Could not reach the service.');
+    }
+  }
+
+  const askText = el('askText');
+  document.querySelectorAll('button.quick[data-q]').forEach((b) =>
+    b.addEventListener('click', () => ask(b.dataset.q)));
+
+  const askForm = el('askForm');
+  askForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const q = askText.value.trim();
+    if (!q) return;
+    // Leave the text where it is until there is an answer. Clearing on submit
+    // loses the question for anyone who wants to edit and ask again, and a
+    // screen reader has nothing to return to.
+    askText.blur();
+    ask(q);
+  });
+
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    // Not every mobile browser has it. The preset questions are the fallback,
+    // and they are also faster than speaking for the common cases.
+    // Do not leave a dead button. iOS Safari has no SpeechRecognition and no
+    // version of it is coming, but the keyboard's dictation key is the system
+    // speech engine and it works. So this button still speaks -- it opens the
+    // field with the keyboard up, one tap from the microphone, instead of
+    // refusing and leaving the user with three fixed questions.
+    askVoice.textContent = 'Speak your question';
+    askVoice.addEventListener('click', () => {
+      askText.focus();
+      say('Keyboard open. Use the microphone key to speak your question.');
+    });
+  } else {
+    askVoice.addEventListener('click', () => {
+      const rec = new SR();
+      rec.lang = 'en-US';
+      rec.interimResults = false;
+      rec.maxAlternatives = 1;
+      askVoice.textContent = 'Listening — speak now';
+      say('Listening.');
+      rec.onresult = (e) => ask(e.results[0][0].transcript);
+      rec.onerror = () => { say('Did not catch that.'); };
+      rec.onend = () => { askVoice.textContent = 'Hold to ask a question'; };
+      rec.start();
+    });
+  }
+})();
+</script>
+</html>
