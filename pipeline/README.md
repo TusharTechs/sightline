@@ -23,13 +23,14 @@ Description Project list, and all architectural rather than cosmetic:
 
 | Stage | File | Model needed | Status |
 |---|---|---|---|
-| 1. Change gate | `src/detect_changes.py` | no | **works — 9/9 on the fixture, 0 false positives** |
-| 2+3. Salience + description | `src/salience.py` | **yes** | scaffolded; blocked on a model backend |
-| 4. Speech + word budget | `src/speech.py` | no | works — Amazon Polly (generative), `say` fallback |
-| 5. Evaluation | `src/evaluate.py` | no | works |
-| 1b. Gap detection | `src/detect_gaps.py` | no | works |
-| 3b. Fit to gap budget | `src/fit_descriptions.py` | **yes** | works |
-| 6. Render (pause + fit) | `src/render_described.py` | no | works |
+| 1. Change gate (walkthrough) | `src/detect_changes.py` | no | **works — 9/9 on the fixture, 0 false positives** |
+| 1b. Speech gap detection (film) | `src/detect_speech.py` | no | **works — Amazon Transcribe word timings -> 16x more usable time than silence detection** |
+| 1c. Audio onset shape analysis | `src/audio_events.py` | no | **works — separates percussive impacts from score swells (invariance verified in `src/stability.py`)** |
+| 2+3. Salience + description | `src/salience.py` | **yes** | **works — precision 1.00, recall 1.00 on the fixture** |
+| 3b. Film cue generation + ranking | `src/film_cues.py` | **yes** | **works — concurrent pass, continuity repair, global rank** |
+| 4. Speech + word budget | `src/speech.py` | no | **works — Amazon Polly (generative), calibrated at 203 wpm** |
+| 5. Evaluation + preflight QA | `src/evaluate.py`, `src/preflight.py` | no | **works — catches camera language, dialogue collisions, coverage holes** |
+| 6. Device bundle + render | `src/export_device_bundle.py`, `src/render_from_bundle.py` | no | **works — fragmented MP4 + 48kHz PCM + ranked timeline** |
 
 The gate is deliberately sensitive and dumb. Diff magnitude is a terrible
 salience proxy — a scroll changes nearly every pixel and means nothing, a ticked
@@ -120,12 +121,15 @@ What was ruled out:
 
 `get-foundation-model-availability` reports `authorizationStatus: AUTHORIZED`,
 `entitlementAvailability: AVAILABLE`, `regionAvailability: AVAILABLE`, and
-`agreementAvailability: NOT_AVAILABLE`.
+(as of 23 September 2026) `agreementAvailability: AVAILABLE` across two Claude
+models and all sixteen Amazon Nova models — yet every `InvokeModel` call still
+fails with `Error 002`.
 
 So this is account state that only AWS can change — creating an IAM user cannot
-fix it. Raise it with AWS Support (Bedrock model agreement unavailable despite
-being authorized and entitled), and check the account has a valid payment
-method. Meanwhile use the `anthropic` backend.
+fix it, and nothing in the API response names the condition. Full details are in
+[`../FEEDBACK.md`](../FEEDBACK.md). Meanwhile the pipeline uses the `anthropic`
+backend (`--backend anthropic`), and the Bedrock client (`--backend bedrock`) is
+shipped alongside it.
 
 ## Scoring caveat
 
@@ -145,6 +149,7 @@ blocked.
 
 Output is **16-bit 48 kHz stereo interleaved PCM**, which is what
 `AudioPlaybackStream.writeAsync()` takes on Vega. Never MP3 — all decoding
+happens host-side; the device is handed raw samples.
 
 ## Fit-the-gaps: what the speed test actually showed
 
@@ -177,8 +182,11 @@ The first implementation guessed 170 wpm and every line overflowed; the voice
 actually delivers 203 wpm once Polly's padding is trimmed, and the padding was
 the dominant error.
 
-## Not built yet
+## Built from these findings
 
-- **Priority ordering** when there are more changes than gaps (see above).
-- **Interactive questions** mid-playback.
-- **Companion phone channel.**
+- **Priority ordering** when there are more changes than gaps — implemented in
+  `src/film_cues.py`, `src/export_device_bundle.py`, and `app/src/media/Scheduler.ts`.
+- **Interactive questions** mid-playback — implemented in `companion/server.py`
+  and deployed serverless in `infra/lambda_function.py`.
+- **Companion phone channel** for co-viewing — implemented in
+  `companion/phone.html` and `companion/server.py`.

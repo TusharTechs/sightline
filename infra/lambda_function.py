@@ -139,16 +139,19 @@ class ModelRefused(Exception):
 
 
 def ask_model(frame_jpg, question, context):
+    content = []
+    if frame_jpg:
+        content.append({"type": "image", "source": {
+            "type": "base64",
+            "media_type": "image/jpeg",
+            "data": base64.b64encode(frame_jpg).decode()}})
+    content.append({"type": "text", "text": (
+        PROMPT.format(question=question, max_words=MAX_WORDS, context=context)
+        if frame_jpg else question)})
     body = {
         "model": MODEL,
-        "max_tokens": 1024,
-        "messages": [{"role": "user", "content": [
-            {"type": "image", "source": {"type": "base64",
-                                         "media_type": "image/jpeg",
-                                         "data": base64.b64encode(frame_jpg).decode()}},
-            {"type": "text", "text": PROMPT.format(
-                question=question, max_words=MAX_WORDS, context=context)},
-        ]}],
+        "max_tokens": 1024 if frame_jpg else 16,
+        "messages": [{"role": "user", "content": content}],
     }
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages",
@@ -263,10 +266,16 @@ def lambda_handler(event, context):
         return _reply(400, {"error": "bad timestamp"})
 
     base = f"{SITE}/{VIDEOS[video]}"
+    idx = max(1, int(t) + 1)
     try:
         timeline = _get(base + "timeline.json")
         transcript = _get(base + "transcript.json")
-        frame = _get(f"{base}frames/{int(t) + 1:05d}.jpg", binary=True)
+        try:
+            frame = _get(f"{base}frames/{idx:05d}.jpg", binary=True)
+        except urllib.error.HTTPError:
+            # At the end of a clip (e.g. 52.2s on a 52-frame extract), int(t)+1
+            # is one past the last frame. Step back to the final extracted second.
+            frame = _get(f"{base}frames/{max(1, idx - 1):05d}.jpg", binary=True)
     except urllib.error.HTTPError:
         # Past the last extracted second, or the clip has no frame there.
         return _reply(404, {"error": "no frame for that moment"})

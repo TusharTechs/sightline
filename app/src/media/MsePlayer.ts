@@ -4,7 +4,7 @@
  * URL mode (`player.src = url`) does not work on this platform — it fails
  * before issuing a network request, for every media type. MSE does, because we
  * fetch the bytes ourselves and hand them to the player. See probes/ and
- * HANDOFF.md.
+ * BUG-REPORT-media-playback.md.
  *
  * Content must be FRAGMENTED mp4; a plain mp4 will not append.
  */

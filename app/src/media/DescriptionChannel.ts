@@ -8,7 +8,8 @@
  *
  * Deliberately NOT w3cmedia. This path works on the virtual device where URL
  * mode does not, it needs no media server, and raw PCM gives frame-accurate
- * timing, which everything about gap budgeting depends on. See HANDOFF.md.
+ * timing, which everything about gap budgeting depends on. See
+ * BUG-REPORT-media-playback.md and VEGA-FIELD-NOTES.md.
  *
  * Audio is 16-bit 48kHz stereo interleaved — the format the platform sink
  * reports. All decoding happens host-side; the device is handed samples.

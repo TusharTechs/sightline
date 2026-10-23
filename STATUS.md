@@ -1,6 +1,6 @@
-# Status — 13 September 2026
+# Status — 23 October 2026
 
-Day 7 of 46. **39 effective days** (treat 22 October as the deadline).
+Submission day.
 
 ## Done, and verified on device
 
@@ -10,10 +10,10 @@ Day 7 of 46. **39 effective days** (treat 22 October as the deadline).
 | Video playback on Fire TV | MSE; URL mode is broken on this platform and avoided deliberately |
 | Description audio on Fire TV | PCM on a `USAGE_ACCESSIBILITY` stream; ducks the film automatically |
 | Fit-the-gaps and pause-and-explain | both modes, measured at 1x / 1.5x / 2x |
-| Speech-based gap detection | 17x more usable time than silence detection on real footage |
+| Speech-based gap detection | 16x more usable time than silence detection on real footage |
 | Ranked scheduling | rank fixed once; speed changes depth, never order |
 | Co-viewing | room hears the film untouched, description goes only to the phone |
-| Interactive questions | answers from the frame the television is actually on |
+| Interactive questions | answers from the frame the television is actually on, and live on the hosted demo via AWS Lambda + API Gateway |
 
 ## Not done — in the order I would fix them
 
@@ -63,21 +63,11 @@ Description is still generated before playback rather than during it. That is
 the design — generate once for content nobody will ever describe by hand — but
 the work is no longer invisible.
 
-Description is generated **ahead of playback** and the app fetches a prebuilt
-bundle. Questions are answered live; the description track is not. That is a
-perfectly good design — generate once for content nobody will ever describe by
-hand — but it is not what "real time" implies, and a judge reading the claim and
-then seeing a prebuilt file has caught us in something.
-
-Two honest routes: describe it accurately, or wire generation to the app so the
-claim is visible. The second is stronger, because otherwise the generation — the
-part with all the work in it — never appears on screen.
-
-### 4. No blind user has operated the app.
+### 4. No blind user has operated the television app.
 
 Two blind reviewers have shaped the design through correspondence, and they
-have now listened to the rendered clips. Six faults came out of their review
-in total, all fixed. Two came specifically from listening:
+have tested the web player and listened to the rendered clips. Seven faults
+came out of their review in total, all fixed:
 
 - A description arrived 0.15s after a line of dialogue ended, so the line
   itself was missed. The pause after speech is now 0.7s.
@@ -87,28 +77,39 @@ in total, all fixed. Two came specifically from listening:
   descriptions. A cap now applies after ranking, so what survives is the most
   needed description from anywhere in the film.
   See `pipeline/src/film_cues.py`.
+- A high shot through rafters was described as "someone watches her sleep",
+  inventing a character not in the film. Camera language is now rejected by
+  `pipeline/src/preflight.py`.
+- Attenuating a file by 3 dB flipped five onset classifications because the
+  audio loader was reading 16-bit and clipping peaks. Fixed and guarded by
+  `pipeline/src/stability.py`.
+- On iOS, `film.volume` is read-only, so ducking did nothing and the score
+  drowned out the description. The film now routes through a Web Audio gain
+  node (`companion/phone.html`).
+- VoiceOver repeated status lines continuously and played an empty-element tone
+  whenever the transcript prepended a line. The live region now mutates only on
+  state changes and the log is append-only (`companion/phone.html`).
+- Once playback started on the web player, there was no way to stop except
+  closing the tab, and pausing the video left an in-progress description
+  speaking. The primary button now toggles **Pause / Resume** — halting the
+  voice pool as well as the film — and **Escape** stops playback from anywhere.
 
-What is still untested: nobody has operated the Fire TV app or the phone
-companion. Every claim about the app itself, as opposed to the clips it plays,
-rests on my judgement and one fixture I wrote myself.
-
-Saksham Trust and Score Foundation have not replied.
+What is still untested: nobody blind has operated the Fire TV app on a
+television.
 
 ### 5. Smaller, real
 
-- **The drop tone has never fired.** No run has dropped a cue; the idea is built
-  and untested.
+- **The drop tone has never fired on the trailer.** At 1x every cue fits; the
+  tone is exercised at 1.5x / 2x and in unit tests (`app/test/Scheduler.spec.ts`).
 - **Questions take about 7 seconds.** Tolerable, not good.
-- **One hardcoded timeline.** No way to choose content in the app.
-- **Pause-and-explain has never been run on film**, only on the walkthrough.
-- **No error handling story.** Unclear what the app does if the service dies
-  mid-playback.
+- **Pause-and-explain has only been run on the walkthrough**, not on film.
 - **Never run on physical hardware.** Not required for the hackathon, but
   required before Appstore submission, and it is where audio focus and ducking
   would be properly exercised.
 
-## Then
+## Open upstream
 
-- Devpost writeup.
-- Demo video, on the finished product.
-- Amazon's answer on the media bug, whenever it comes.
+- Amazon's answer on the Vega Virtual Device URL-mode media bug
+  ([topic 29117](https://community.amazondeveloper.com/t/audioplayer-url-mode-fails-with-media-err-src-not-supported-on-vvd-app-never-connects-to-com-amazon-media-server-both-official-media-samples-also-fail/29117)).
+- Account-level `Error 002` on Amazon Bedrock, documented in
+  [`FEEDBACK.md`](FEEDBACK.md).

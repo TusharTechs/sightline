@@ -12,7 +12,7 @@
 Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 
 [![tests](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml/badge.svg)](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml)
-[![92 tests](https://img.shields.io/badge/tests-92%20passing-success)](#what-is-tested-and-why)
+[![97 tests](https://img.shields.io/badge/tests-97%20passing-success)](#what-is-tested-and-why)
 [![Linux · macOS · Windows](https://img.shields.io/badge/runs%20on-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-informational)](#run-it)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
@@ -53,7 +53,7 @@ The quickest way to check this is real rather than described:
 | **that it works** | [the live demo](https://tushartechs.github.io/sightline/) — press play and listen |
 | **that it runs on the device** | [`app/`](app/) — a real Vega OS app; [`probes/`](probes/) shows what the platform would and would not do |
 | **that the numbers are real** | [Evidence](#evidence) — two of them reproduce with the commands given |
-| **that the design is not guesswork** | [Why it works this way](#how-we-knew-what-to-build) — two blind reviewers, quoted directly, including the six faults one of them found |
+| **that the design is not guesswork** | [Why it works this way](#how-we-knew-what-to-build) — two blind reviewers, quoted directly, including the seven faults one of them found |
 | **that it works on a real story** | [three minutes of the film](https://tushartechs.github.io/sightline/film/) — the trailer withholds its story by design; this does not |
 | **that it is not one hand-tuned clip** | three different videos described by the same pipeline — [a film](https://tushartechs.github.io/sightline/film/), [a 1951 instructional film](https://tushartechs.github.io/sightline/duck/), and the trailer |
 | **where it does NOT work** | [`docs/where-it-works.md`](docs/where-it-works.md) — measured. An advert produces zero descriptions |
@@ -204,21 +204,26 @@ listener at all. Three clips are played twice to measure your own consistency,
 because a machine that changes its mind is only unreliable if it does so more
 often than a person.
 
-*Asking questions is not available on the hosted pages — answers are generated
-from the frame on screen and need a server. The hosted page says so where the
-feature would be, rather than hiding it. Run it locally for that.*
+**Asking questions works directly on the hosted pages** — type a question (or
+use your phone keyboard's dictation key) or tap one of the presets. The page
+sends the current playhead to a live AWS Lambda endpoint
+([`infra/lambda_function.py`](infra/lambda_function.py)), which reads the
+pre-extracted frame and the spoiler-free transcript and description history up
+to that second, asks Claude Opus 5, and speaks the answer via Amazon Polly.
 
-### Running the whole thing locally
+### Running the companion service locally
 
-One command after cloning, and this adds the question answering:
+One command after cloning adds live Fire TV playhead following and on-demand
+generation for new videos:
 
 ```bash
 SIGHTLINE_BUNDLE=/path/to/bundle pipeline/.venv/bin/python companion/server.py
 ```
 
-Then open `http://localhost:8190/` and press **Play with description**. You get
-the film with generated description ducked over it, and the **Ask about this
-moment** buttons work — the answer comes from the frame you are actually on.
+Then open `http://localhost:8190/` and press **Play with description** (or
+**Follow a Fire TV instead** when the Vega app is running). You get the film
+with generated description ducked over it, and **Ask about this moment** pulls
+the exact frame from the local video.
 
 On the same network, other devices can reach it at your machine's LAN address
 (`http://192.168.x.x:8190/`) — useful for testing on a phone, but it is a
@@ -366,6 +371,13 @@ had:
 > → there was nobody there. A high shot through rafters had been described as
 > "someone watches her sleep". It had turned a camera angle into a person, and
 > a listener cannot check an invented character against the picture.
+
+> **There was no way to stop except closing the tab.**
+> → `running` was set true once and never cleared, and pausing the video left
+> an in-progress description speaking through its own audio pool. The primary
+> button now toggles **Pause** and **Resume** — halting the voice pool as well
+> as the film and releasing the duck — and **Escape** stops playback from
+> anywhere on the page.
 
 [`pipeline/src/preflight.py`](pipeline/src/preflight.py) now fails a clip
 before anyone hears it, for each class of fault above that can be detected
@@ -563,11 +575,11 @@ operating system. Press **Play with description**.
 
 ## What is tested, and why
 
-92 tests. Each one locks a behaviour this project argues for, or a fault a
+97 tests. Each one locks a behaviour this project argues for, or a fault a
 blind reviewer found. None of them need AWS, a Fire TV or a network.
 
 ```bash
-python -m pytest pipeline/tests -q        # 77
+python -m pytest pipeline/tests -q        # 82
 cd app && npm test                        # 15
 ```
 
@@ -579,15 +591,17 @@ cd app && npm test                        # 15
 | **Preflight still catches the real faults** | Camera language, dialogue collisions, missing audio, a truncated film. And the inverse: an instructional film that narrates for nine minutes is not blamed for silence it never had room to fill |
 | **Attenuating the file does not move a classification** | The test a blind reviewer proposed. Every quantity is a difference between two levels, so a uniform gain must cancel. It did not, which is how the 16-bit clipping was found. Now asserted to 0.01 dB |
 | **Speed changes the depth, never the order** | *"What I can't live with is a different story at a different speed."* What survives at 2x must be a rank-ordered prefix of what survives at 1x. Asserted at 1.25x, 1.5x, 2x and 3x |
+| **Questions never leak spoilers, and work at the end of a clip** | The hosted answerer excludes dialogue and descriptions after `t`, omits an empty image block on `?probe=1`, and steps back to the final extracted frame when a clip stops at a fractional second |
 
 CI runs the pipeline suite on **Linux, macOS and Windows** across two Python
 versions, because this README claims all three and a claim in a README is not
 a test.
 
-**Check the deployed endpoint without spending a model call:**
+**Check the deployed endpoint (with or without a live model probe):**
 
 ```bash
 curl https://s4i9xx7htg.execute-api.us-east-1.amazonaws.com/health
+curl "https://s4i9xx7htg.execute-api.us-east-1.amazonaws.com/health?probe=1"
 ```
 
 ---
@@ -623,7 +637,7 @@ is now written. It wrote code under direction and was corrected constantly.
   [`docs/where-it-works.md`](docs/where-it-works.md), including the advert that
   correctly produces nothing.
 - **Getting it tested by blind users, and acting on what came back.** Two
-  reviewers, six faults, all fixed, and a QA harness released so the next
+  reviewers, seven faults, all fixed, and a QA harness released so the next
   person does not repeat them.
 - **The fifteen findings in [`FRICTION-LOG.md`](FRICTION-LOG.md)**, written
   while building.
@@ -635,8 +649,9 @@ wrong because a blind viewer does not care where the camera is.
 
 ## AWS integration
 
-Three AWS services do real work in the pipeline — not decoration, and each
-earned its place by solving a specific problem.
+Five AWS services do real work across the pipeline and the live question
+endpoint — not decoration, and each earned its place by solving a specific
+problem.
 
 ### Amazon Transcribe — finding where description can go
 
@@ -684,6 +699,25 @@ Transcribe reads its input from S3, so audio is uploaded, transcribed and the
 object deleted in the same call. The bucket is private with public access
 blocked.
 
+### AWS Lambda and Amazon API Gateway — answering questions on the public demo
+
+[`infra/lambda_function.py`](infra/lambda_function.py) · [`infra/template.yaml`](infra/template.yaml) · [`infra/deploy_ask.py`](infra/deploy_ask.py)
+
+The public demo is static files on GitHub Pages, and a static page cannot hold a
+model key or run `ffmpeg`. Putting the question endpoint behind an HTTP API
+(`s4i9xx7htg.execute-api.us-east-1.amazonaws.com`) and an arm64 Python 3.12
+Lambda function made mid-scene questions work on the public link without a local
+server.
+
+Instead of downloading the video on every question, the function fetches the
+pre-extracted 11 KB JPEG for that second (`frames/00015.jpg`) plus the cached
+Transcribe timings and timeline up to the viewer's playhead (`t <= now`, so
+nothing later in the film can leak as a spoiler), calls the model, synthesises
+the reply with Amazon Polly (`Ruth`, generative), and returns the MP3 inline as
+base64 to save a second round trip on a mobile connection. If the model is
+unavailable, it falls back to a clearly labelled recap of the dialogue and
+descriptions heard so far rather than returning an error.
+
 ### What is deliberately not AWS
 
 Bedrock. It is refused at the account level on this account —
@@ -692,7 +726,7 @@ region, for every model, while S3, Polly and Transcribe all work on the same
 credentials. The Bedrock client is written and shipped
 (`pipeline/src/salience.py`, `--backend bedrock`, using `AnthropicBedrockMantle`)
 and the first-party API is used instead. The diagnosis is in
-[`STATUS.md`](STATUS.md).
+[`FEEDBACK.md`](FEEDBACK.md) and [`STATUS.md`](STATUS.md).
 
 ## What is in here
 
@@ -701,8 +735,9 @@ and the first-party API is used instead. The diagnosis is in
 | [`app/`](app/) | the Vega OS Fire TV app |
 | [`pipeline/`](pipeline/) | description generation, evaluation, rendering |
 | [`companion/`](companion/) | phone channel and the question endpoint |
+| [`infra/`](infra/) | AWS Lambda + API Gateway question endpoint (`template.yaml`, `deploy_ask.py`) |
 | [`probes/`](probes/) | minimal apps that isolate what works on this platform |
-| [`FRICTION-LOG.md`](FRICTION-LOG.md) | 14 entries on developing for Vega |
+| [`FRICTION-LOG.md`](FRICTION-LOG.md) | 15 entries on developing for Vega |
 | [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) | practical notes for other developers |
 | [`STATUS.md`](STATUS.md) | what is done and what is not, honestly |
 
@@ -710,7 +745,7 @@ and the first-party API is used instead. The diagnosis is in
 
 ## What we learned building on Vega
 
-[`FRICTION-LOG.md`](FRICTION-LOG.md) has 14 entries from real work, and
+[`FRICTION-LOG.md`](FRICTION-LOG.md) has 15 entries from real work, and
 [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) is the developer-facing companion —
 the things that cost us days and are in neither the documentation nor the forum.
 The sharpest: **`vega device run-cmd` is a sandboxed app context**, so platform
@@ -730,7 +765,7 @@ Kept current in [`STATUS.md`](STATUS.md). The ones worth knowing before you judg
   Questions *are* answered live. Generating once for content nobody will ever
   describe by hand is the design; we would rather say so than imply otherwise.
 - **Blind reviewers have used the web player, not the Fire TV app.** They
-  found six faults in it, all fixed. The pipeline faults among them — the
+  found seven faults in it, all fixed. The pipeline faults among them — the
   truncated timeline, the invented character — affect the television app
   equally, because it is the same generated description. The iOS-specific ones
   do not. Nobody blind has operated the app on a television.
