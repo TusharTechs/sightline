@@ -12,13 +12,14 @@
 Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 
 [![tests](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml/badge.svg)](https://github.com/TusharTechs/sightline/actions/workflows/ci.yml)
-[![110 tests](https://img.shields.io/badge/tests-110%20passing-success)](#what-is-tested-and-why)
+[![111 tests](https://img.shields.io/badge/tests-111%20passing-success)](#what-is-tested-and-why)
 [![Linux · macOS · Windows](https://img.shields.io/badge/runs%20on-Linux%20%C2%B7%20macOS%20%C2%B7%20Windows-informational)](#run-it)
 [![MIT](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
 <br>
 
-[**▶ Demo video (3 min)**](https://youtu.be/vqJsFDnj7ko) &nbsp;·&nbsp;
+[**▶ Demo video (3 min)**](https://youtu.be/oK298w3dh9E) &nbsp;·&nbsp;
+[**▶ Open Source QA video (1:20)**](https://youtu.be/w2UKKdmRgGI) &nbsp;·&nbsp;
 [**Live demo**](https://tushartechs.github.io/sightline/) &nbsp;·&nbsp;
 [**Watch it work**](#watch-it-work) &nbsp;·&nbsp;
 [**Try it yourself**](#try-it-without-a-fire-tv) &nbsp;·&nbsp;
@@ -33,9 +34,9 @@ Build, Ship, Shape: Amazon Developer Hackathon 2026 · Fire TV (Vega OS) track
 
 <br>
 
-[![Sightline: audio description for content that has none](docs/demo-thumbnail.jpg)](https://youtu.be/vqJsFDnj7ko)
+[![Sightline: audio description for content that has none](docs/demo-thumbnail.jpg)](https://youtu.be/oK298w3dh9E)
 
-**[Watch the three-minute demo](https://youtu.be/vqJsFDnj7ko)**
+**[Watch the three-minute demo](https://youtu.be/oK298w3dh9E)** &nbsp;·&nbsp; **[Watch the Open Source contribution video (`audio-description-qa`)](https://youtu.be/w2UKKdmRgGI)**
 
 <br>
 
@@ -49,19 +50,19 @@ The quickest way to check this is real rather than described:
 
 | to see | open |
 |---|---|
-| **the whole thing in three minutes** | [the demo video](https://youtu.be/vqJsFDnj7ko) — the app on the device, a real generation run, and a question answered live |
+| **the whole thing in three minutes** | [the demo video](https://youtu.be/oK298w3dh9E) — the app on the device, audio description + sign-language voicing, and a question answered live |
 | **that it works** | [the live demo](https://tushartechs.github.io/sightline/) — press play and listen |
 | **that it runs on the device** | [`app/`](app/) — a real Vega OS app; [`probes/`](probes/) shows what the platform would and would not do |
 | **that the numbers are real** | [Evidence](#evidence) — two of them reproduce with the commands given |
 | **that the design is not guesswork** | [Why it works this way](#how-we-knew-what-to-build) — two blind reviewers, quoted directly, including the seven faults one of them found |
 | **that it works on a real story** | [three minutes of the film](https://tushartechs.github.io/sightline/film/) — the trailer withholds its story by design; this does not |
-| **that it is not one hand-tuned clip** | three different videos described by the same pipeline — [a film](https://tushartechs.github.io/sightline/film/), [a 1951 instructional film](https://tushartechs.github.io/sightline/duck/), and the trailer |
+| **that it is not one hand-tuned clip** | four different videos described by the same pipeline — [a film](https://tushartechs.github.io/sightline/film/), [a 1951 instructional film](https://tushartechs.github.io/sightline/duck/), [an ASL sign-language video](https://tushartechs.github.io/sightline/signs/), and the trailer |
 | **where it does NOT work** | [`docs/where-it-works.md`](docs/where-it-works.md) — measured. An advert produces zero descriptions |
 | **what the platform cost us** | [`FRICTION-LOG.md`](FRICTION-LOG.md) — 15 findings from building on Vega, written while building |
 | **everything we would ask Amazon to fix** | [`FEEDBACK.md`](FEEDBACK.md) — 21 requests with priorities, plus what worked and what did not, per tool |
 | **what we learned about Vega** | [`FRICTION-LOG.md`](FRICTION-LOG.md) (15 entries) and [`VEGA-FIELD-NOTES.md`](VEGA-FIELD-NOTES.md) |
 | **what is not finished** | [`STATUS.md`](STATUS.md) — kept honest, including what no blind user has tested yet |
-| **the Open Source entry** | [audio-description-qa](https://github.com/TusharTechs/audio-description-qa) — the blind-tester QA harness, released separately under MIT so anyone writing description can use it |
+| **the Open Source entry** | [audio-description-qa](https://github.com/TusharTechs/audio-description-qa) ([▶ 80s explainer video](https://youtu.be/w2UKKdmRgGI)) — the blind-tester QA harness, released separately under MIT so anyone writing description can use it |
 
 **Fastest check of all:** [tushartechs.github.io/sightline](https://tushartechs.github.io/sightline/) — press play and listen. Nothing to
 install.
@@ -76,7 +77,7 @@ install.
 | **Quality of the idea** | [What this does that a phone app pointed at a screen does not](#what-this-does-that-a-phone-app-pointed-at-a-screen-does-not), and [Limitations](#limitations). It describes what was never going to be described, and it says where it stops |
 | **Friction log bonus** | [`FRICTION-LOG.md`](FRICTION-LOG.md), 15 entries, each with task, steps, expected against actual, severity, workaround and suggestion. Summarised with priorities in [`FEEDBACK.md`](FEEDBACK.md) |
 | **AWS Builder mini challenge** | [AWS integration](#aws-integration). Transcribe, Polly, S3, Lambda and API Gateway, with measurements. Bedrock is included as a documented failure rather than omitted |
-| **Open Source mini challenge** | [audio-description-qa](https://github.com/TusharTechs/audio-description-qa), MIT, created during the hackathon window |
+| **Open Source mini challenge** | [audio-description-qa](https://github.com/TusharTechs/audio-description-qa) ([▶ video](https://youtu.be/w2UKKdmRgGI)), MIT, created during the hackathon window |
 
 ## Where this sits against the Fire TV priority categories
 
@@ -142,9 +143,14 @@ batch job months earlier, you can interrupt it and ask a question.
 
 ## Watch it work
 
-**[▶ The three-minute demo video](https://youtu.be/vqJsFDnj7ko)** — the app running on
+**[▶ The three-minute demo video](https://youtu.be/oK298w3dh9E)** — the app running on
 the Vega virtual device, a real generation run against a clip nothing had ever
-described, and a question typed and answered live on a second screen.
+described, sign-language and on-screen title voicing, and a question typed and
+answered live on a second screen.
+
+**[▶ The Open Source contribution video (`audio-description-qa`, 1:20)](https://youtu.be/w2UKKdmRgGI)** —
+how the four automated quality checks (`preflight`, `audio_events`, `stability`,
+`shape_test`) catch broken bundles before a blind viewer ever hears them.
 
 ![Sightline describing a film on Fire TV](docs/screens/sightline.gif)
 
