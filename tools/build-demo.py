@@ -151,7 +151,7 @@ EDIT = [
     ("s06", "CARD:later", 0, 1.8, [],                             0.0),
     ("s07", S3,   0.0, 12.8,  [("05_same", 0.3)],                 1.0),
     ("s07b", S3B, 0.0,  8.3,  [("05b_signs_gap", 0.2)],           1.0),
-    ("s07c", S3C, 0.0, 10.2,  [],                                 1.0),
+    ("s07c", S3C, 0.0, 15.0,  [],                                 1.0),
     # after the handoff announcement (1.8-3.3s), not over it.
     ("s08", S4TV, 0.0, 11.8,  [("06_tworoom", 3.5)],              0.85),
     # the answer starts 5.0s in; this has to be finished before it.
