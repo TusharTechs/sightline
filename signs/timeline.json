@@ -14,72 +14,80 @@
   "gaps": [
     {
       "start": 0.0,
-      "end": 24.683
+      "end": 4.9
+    },
+    {
+      "start": 5.0,
+      "end": 9.8
+    },
+    {
+      "start": 10.0,
+      "end": 16.8
+    },
+    {
+      "start": 17.0,
+      "end": 24.5
     }
   ],
   "cues": [
     {
-      "t": 0.4,
+      "t": 0.6,
       "rank": 4,
       "pcm": "desc-04.pcm",
-      "text": "She signs: parents supporting children, with interpreter Amy E. Peterson.",
-      "duration": 4.6,
+      "text": "She signs: parents supporting children.",
+      "duration": 2.305,
       "caused_by_viewer": false,
-      "why_ranked": "title and credit card, no story content",
+      "why_ranked": "title card, decorative",
       "sign": {
-        "found": true,
         "kind": "sign_language",
-        "raw_meaning": "ASL video series: Parents supporting children, with Certified Deaf Interpreter Amy E. Peterson.",
-        "transcript_entry": "[Sign: \"ASL video series: Parents supporting children, with Certified Deaf Interpreter Amy E. Peterson.\"]",
-        "spoken_description": "ASL series: parents supporting children, presented by certified deaf interpreter Amy E. Peterson."
+        "raw_meaning": "Parents supporting children",
+        "transcript_entry": "[Sign: Parents supporting children]",
+        "found": true
       }
     },
     {
-      "t": 6.171,
+      "t": 5.4,
       "rank": 3,
       "pcm": "desc-03.pcm",
-      "text": "Second, here is the next important point to understand.",
-      "duration": 3.111,
+      "text": "On screen: Amy E. Peterson, Certified Deaf Interpreter.",
+      "duration": 4.015,
       "caused_by_viewer": false,
-      "why_ranked": "signed structural transition, less substantive",
+      "why_ranked": "identifies who the speaker is",
       "sign": {
-        "found": true,
-        "kind": "sign_language",
-        "raw_meaning": "Second point: here is the next thing to know.",
-        "transcript_entry": "[Sign: \"Second point: here is the next thing to know.\"]",
-        "spoken_description": "Second, here is the next important point to understand."
+        "kind": "written_sign",
+        "raw_meaning": "Amy E. Peterson, M.Ed., Certified Deaf Interpreter",
+        "transcript_entry": "[On-screen sign: Amy E. Peterson, Certified Deaf Interpreter]",
+        "found": true
       }
     },
     {
-      "t": 12.341,
+      "t": 10.3,
       "rank": 1,
       "pcm": "desc-01.pcm",
       "text": "Working together as a team, we follow the same rules and support one another.",
       "duration": 4.135,
       "caused_by_viewer": false,
-      "why_ranked": "silent signed content carrying the core message",
+      "why_ranked": "silent signed content carrying the actual message",
       "sign": {
-        "found": true,
         "kind": "sign_language",
-        "raw_meaning": "Working together as a team, we each follow the same rules and support one another.",
-        "transcript_entry": "[Sign: \"Working together as a team, we each follow the same rules and support one another.\"]",
-        "spoken_description": "Working together as a team, we follow the same rules and support one another."
+        "raw_meaning": "Working together as a team, following the same rules and supporting one another",
+        "transcript_entry": "[Sign: Working together as a team, we follow the same rules and support one another]",
+        "found": true
       }
     },
     {
-      "t": 18.512,
+      "t": 17.2,
       "rank": 2,
       "pcm": "desc-02.pcm",
       "text": "Stress builds up, so think about what you need and give yourself a break.",
       "duration": 3.881,
       "caused_by_viewer": false,
-      "why_ranked": "signed advice invisible by any other route",
+      "why_ranked": "further signed content invisible and absent from transcript",
       "sign": {
-        "found": true,
         "kind": "sign_language",
-        "raw_meaning": "Stress builds up, so think about what you need and take a break.",
-        "transcript_entry": "[Sign: \"Stress builds up, so think about what you need and take a break.\"]",
-        "spoken_description": "Stress builds up, so think about what you need and give yourself a break."
+        "raw_meaning": "When stress builds up, think about what you need and give yourself a break",
+        "transcript_entry": "[Sign: Stress builds up, so think about what you need and give yourself a break]",
+        "found": true
       }
     }
   ]
